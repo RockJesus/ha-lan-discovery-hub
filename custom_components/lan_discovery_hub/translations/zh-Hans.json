@@ -2,11 +2,11 @@
   "config": {
     "step": {
       "user": {
-        "description": "每个 HA 实例只需一个本集成。它会监听局域网广播，并为每个新设备弹出修复提示。"
+        "description": "每个实例一个中枢。它会监听局域网广播、记录发现的设备，并为每个新设备生成一条带有「前往添加」入口的修复提示。"
       }
     },
     "abort": {
-      "single_instance_allowed": "仅允许一个实例。"
+      "single_instance_allowed": "只允许一个实例。"
     }
   },
   "options": {
@@ -22,7 +22,22 @@
   "issues": {
     "new_device": {
       "title": "发现新的局域网设备：{name}",
-      "description": "设备 **{name}**（{service_type}）出现在局域网中。建议的集成：{integration}。请到「设置 → 设备与服务」中配置它，或在选项中忽略该服务类型。"
+      "description": "**{name}** 在网络上广播了自己（{service_type}）。\n\n建议使用的集成：**{integration}** —— {state}。\n\n点击「修复」继续；如果不想看到这类提示，可以在中枢选项里忽略该服务类型。"
+    }
+  },
+  "fix_flow": {
+    "abort": {
+      "cannot_start_flow": "无法打开 **{integration}** 的配置流程。它可能是尚未安装的自定义集成，请先通过 HACS 安装。"
+    },
+    "step": {
+      "init": {
+        "title": "将此设备添加到 Home Assistant",
+        "description": "建议使用的集成：**{integration}**。\n\n继续将打开该集成的配置流程。不会自动添加任何设备，一切由你决定。"
+      },
+      "confirm": {
+        "title": "将此设备添加到 Home Assistant",
+        "description": "建议使用的集成：**{integration}**。"
+      }
     }
   },
   "entity": {

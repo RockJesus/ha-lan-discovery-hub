@@ -64,14 +64,24 @@ class DiscoveredDevicesSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         """Return the discovered devices as attributes."""
-        return {
-            "devices": [
+        devices = []
+        for info in self._hub.store.data.values():
+            domain = info.get("suggested_integration")
+            devices.append(
                 {
                     "name": info["name"],
                     "type": info["service_type"],
-                    "integration": info.get("suggested_integration"),
+                    "integration": domain,
+                    # 方便用户在界面上判断「该装/该加什么」
+                    "integration_installed": (
+                        bool(self.hass.config_entries.async_entries(domain))
+                        if domain
+                        else None
+                    ),
+                    "host": info.get("host"),
+                    "port": info.get("port"),
                     "first_seen": info["first_seen"],
+                    "acknowledged": info.get("acknowledged", False),
                 }
-                for info in self._hub.store.data.values()
-            ]
-        }
+            )
+        return {"devices": devices}

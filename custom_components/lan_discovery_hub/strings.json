@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "description": "One hub per instance. It listens to LAN broadcasts and raises a repair issue for each new device."
+        "description": "One hub per instance. It listens to LAN broadcasts, records every device it sees, and raises a repair issue with a shortcut to the matching integration."
       }
     },
     "abort": {
@@ -22,7 +22,22 @@
   "issues": {
     "new_device": {
       "title": "New LAN device found: {name}",
-      "description": "A device announced itself as **{name}** ({service_type}). Suggested integration: {integration}. Configure it in Settings > Devices & Services, or ignore this service type in the hub options."
+      "description": "**{name}** announced itself on the network ({service_type}).\n\nSuggested integration: **{integration}** — {state}.\n\nClick **Fix** to continue, or ignore this service type in the hub options if you don't want it."
+    }
+  },
+  "fix_flow": {
+    "abort": {
+      "cannot_start_flow": "Could not open the setup flow for **{integration}**. It may be a custom integration that is not installed yet — install it via HACS first."
+    },
+    "step": {
+      "init": {
+        "title": "Add this device to Home Assistant",
+        "description": "Suggested integration: **{integration}**.\n\nContinue to open its setup flow. Nothing is added automatically — you stay in control."
+      },
+      "confirm": {
+        "title": "Add this device to Home Assistant",
+        "description": "Suggested integration: **{integration}**."
+      }
     }
   },
   "entity": {
