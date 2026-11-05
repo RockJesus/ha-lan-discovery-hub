@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import hashlib
 import logging
 from typing import Any
 
@@ -33,6 +34,17 @@ _LOGGER = logging.getLogger(__name__)
 
 STORAGE_VERSION = 1
 STORAGE_KEY = "lan_discovery_hub/devices"
+
+
+def _issue_id(device_key: str) -> str:
+    """Derive a stable issue id from a device key.
+
+    ``hash()`` 受 PYTHONHASHSEED 影响，进程重启后结果会变，用它做 issue id
+    会导致旧 issue 永远删不掉、并且越积越多。改用 sha1 摘要的前 16 位。
+    """
+    digest = hashlib.sha1(device_key.encode()).hexdigest()[:16]
+    return f"{ISSUE_NEW_DEVICE}_{digest}"
+
 
 # hassfest 已收录的、由对应集成负责的常见服务类型（示例子集，
 # 完整映射表在 homeassistant/components/zeroconf/discovery.py）。
@@ -97,9 +109,14 @@ class DiscoveryHub:
             AsyncServiceBrowser,
         )
 
+        # 注意：zeroconf 的 Signal.fire 只以 **kwargs 调用处理器，且参数名固定为
+        # zeroconf / service_type / name / state_change，必须逐一对应；
+        # 签名不匹配会在 AsyncServiceBrowser 构造期间（回放缓存记录时）直接抛
+        # TypeError，导致整个 config entry setup 失败。
         @callback
         def _on_service_state_change(
-            zc: Zeroconf,
+            *,
+            zeroconf: Zeroconf,
             service_type: str,
             name: str,
             state_change: ServiceStateChange,
@@ -148,7 +165,7 @@ class DiscoveryHub:
         async_create_issue(
             self.hass,
             DOMAIN,
-            f"{ISSUE_NEW_DEVICE}_{abs(hash(key)) % 10**10}",
+            _issue_id(key),
             # 2026.11 起可传 config_entry_id= 让 issue 随 entry 清理；
             # 本集成是 single_config_entry，2026.10 上暂手动清理。
             is_fixable=False,
@@ -168,7 +185,5 @@ class DiscoveryHub:
             return
         self.store.data[key]["acknowledged"] = True
         await self.store.async_save()
-        # issue id 在创建时由 key 哈希而来；重放同一哈希以删除
-        async_delete_issue(
-            self.hass, DOMAIN, f"{ISSUE_NEW_DEVICE}_{abs(hash(key)) % 10**10}"
-        )
+        # issue id 与创建时同源派生，保证能删掉
+        async_delete_issue(self.hass, DOMAIN, _issue_id(key))

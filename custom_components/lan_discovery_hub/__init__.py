@@ -11,7 +11,7 @@ import voluptuous as vol
 from homeassistant.helpers.issue_registry import async_delete_issue
 
 from .const import DOMAIN
-from .discovery import DiscoveryHub
+from .discovery import DiscoveryHub, _issue_id
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
@@ -32,16 +32,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: LanDiscoveryConfigEntry)
 
     async def async_acknowledge(call) -> None:
         """Mark a discovered device as acknowledged by the user."""
-        key = call.data["device_key"]
-        await hub.async_acknowledge(key)
+        await hub.async_acknowledge(call.data["device_key"])
 
-    hass.services.async_register(
-        DOMAIN, "acknowledge", async_acknowledge,
-        schema=vol.Schema({vol.Required("device_key"): str}),
-    )
-    entry.async_on_unload(
-        lambda: hass.services.async_remove(DOMAIN, "acknowledge")
-    )
+    # 单实例集成，但仍要防御性判断：reload 期间若旧实例的卸载回调尚未执行，
+    # 直接再注册会抛 ValueError 并让 reload 整体失败。
+    if not hass.services.has_service(DOMAIN, "acknowledge"):
+        hass.services.async_register(
+            DOMAIN, "acknowledge", async_acknowledge,
+            schema=vol.Schema({vol.Required("device_key"): str}),
+        )
+        entry.async_on_unload(
+            lambda: hass.services.async_remove(DOMAIN, "acknowledge")
+        )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: LanDiscoveryConfigEntry) -> bool:
@@ -70,4 +72,4 @@ async def async_remove_entry(hass: HomeAssistant, entry: LanDiscoveryConfigEntry
     if hub is None:
         return
     for key in hub.store.data:
-        async_delete_issue(hass, DOMAIN, f"new_device_{abs(hash(key)) % 10**10}")
+        async_delete_issue(hass, DOMAIN, _issue_id(key))
