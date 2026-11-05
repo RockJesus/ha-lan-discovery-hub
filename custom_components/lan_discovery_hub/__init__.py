@@ -21,8 +21,12 @@ else:
     LanDiscoveryConfigEntry = ConfigEntry
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: LanDiscoveryConfigEntry) -> None:
-    """Set up LAN Discovery Hub from a config entry."""
+async def async_setup_entry(hass: HomeAssistant, entry: LanDiscoveryConfigEntry) -> bool:
+    """Set up LAN Discovery Hub from a config entry.
+
+    必须返回 bool：HA 会检查返回值类型，非 bool 会被判定为 setup 失败
+    （日志：``async_setup_entry did not return boolean``）。
+    """
     hub = DiscoveryHub(hass, entry)
     await hub.async_start()
 
@@ -44,6 +48,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: LanDiscoveryConfigEntry)
         entry.async_on_unload(
             lambda: hass.services.async_remove(DOMAIN, "acknowledge")
         )
+
+    return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: LanDiscoveryConfigEntry) -> bool:
