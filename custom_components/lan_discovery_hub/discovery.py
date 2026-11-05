@@ -36,6 +36,10 @@ _LOGGER = logging.getLogger(__name__)
 STORAGE_VERSION = 1
 STORAGE_KEY = "lan_discovery_hub/devices"
 
+# 记录结构版本。升级逻辑时 +1，旧记录会在下次广播时自动重算，
+# 这样就不必要求用户清存储才能看到新的集成判定结果。
+RECORD_SCHEMA = 2
+
 # HA 启动时不会马上跑完 zeroconf 的初始扫描，留一点时间再发「新设备」提示，
 # 免得开机瞬间弹出一堆其实已经在配置中的设备。
 SETTLE_DELAY = 60
@@ -197,7 +201,9 @@ class DiscoveryHub:
             return
 
         key = f"{service_type}::{name}"
-        if key in self.store.data:
+        existing = self.store.data.get(key)
+        if existing is not None and existing.get("schema") == RECORD_SCHEMA:
+            # 同一套逻辑记录过，不重复处理（避免每次广播都刷 issue）
             return
 
         # 需要完整信息才能判断该用哪个集成（_airplay 要靠 model 区分
@@ -222,13 +228,18 @@ class DiscoveryHub:
 
         target_domain = resolve_domain(service_type, name, props)
         record = {
+            "schema": RECORD_SCHEMA,
             "service_type": service_type,
             "name": name.rsplit(".", 1)[0],
             "host": host,
             "port": port,
             "properties": props,
-            "first_seen": datetime.now(UTC).isoformat(),
+            "first_seen": (existing or {}).get(
+                "first_seen", datetime.now(UTC).isoformat()
+            ),
             "suggested_integration": target_domain,
+            # 从旧结构迁移过来时保留用户「已知悉」的意愿，不要重新弹提示
+            "acknowledged": bool((existing or {}).get("acknowledged", False)),
         }
         self.store.data[key] = record
         await self.store.async_save()
@@ -242,6 +253,10 @@ class DiscoveryHub:
                 "integration": target_domain,
             },
         )
+
+        if record["acknowledged"]:
+            _LOGGER.debug("已忽略的设备重新出现，跳过提示: %s", name)
+            return
 
         self._async_create_issue(key, record)
         _LOGGER.debug("New LAN device: %s (%s) -> %s", name, service_type, target_domain)
