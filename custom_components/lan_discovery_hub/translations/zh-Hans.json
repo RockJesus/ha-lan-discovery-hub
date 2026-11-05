@@ -1,0 +1,35 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "每个 HA 实例只需一个本集成。它会监听局域网广播，并为每个新设备弹出修复提示。"
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "仅允许一个实例。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "description": "要忽略的 mDNS 服务类型（逗号分隔）。",
+        "data": {
+          "ignored_types": "忽略的服务类型"
+        }
+      }
+    }
+  },
+  "issues": {
+    "new_device": {
+      "title": "发现新的局域网设备：{name}",
+      "description": "设备 **{name}**（{service_type}）出现在局域网中。建议的集成：{integration}。请到「设置 → 设备与服务」中配置它，或在选项中忽略该服务类型。"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "discovered_devices": {
+        "name": "已发现设备"
+      }
+    }
+  }
+}

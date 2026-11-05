@@ -1,0 +1,35 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "One hub per instance. It listens to LAN broadcasts and raises a repair issue for each new device."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one instance is allowed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "description": "mDNS service types to ignore (comma separated).",
+        "data": {
+          "ignored_types": "Ignored service types"
+        }
+      }
+    }
+  },
+  "issues": {
+    "new_device": {
+      "title": "New LAN device found: {name}",
+      "description": "A device announced itself as **{name}** ({service_type}). Suggested integration: {integration}. Configure it in Settings > Devices & Services, or ignore this service type in the hub options."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "discovered_devices": {
+        "name": "Discovered devices"
+      }
+    }
+  }
+}

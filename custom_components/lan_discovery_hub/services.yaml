@@ -1,0 +1,11 @@
+acknowledge:
+  name: Acknowledge device
+  description: Mark a discovered LAN device as acknowledged (dismisses its repair issue).
+  fields:
+    device_key:
+      name: Device key
+      description: '"service_type::name" key from the sensor attributes.'
+      required: true
+      example: "_http._tcp.local.::My Printer._http._tcp.local."
+      selector:
+        text:

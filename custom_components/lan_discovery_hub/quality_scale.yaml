@@ -1,0 +1,55 @@
+# 质量分级进度（对照 hassfest quality_scale 规则）
+rules:
+  # ── Bronze ──
+  action-setup: {status: done}
+  appropriate-polling: {status: done, comment: "推送型，无轮询"}
+  brands: {status: done, comment: "brand/ 自带"}
+  common-modules: {status: done}
+  config-flow: {status: done}
+  config-flow-test-coverage: {status: todo}
+  dependency-transparency: {status: done, comment: "after_dependencies 声明"}
+  docs-actions: {status: done, comment: "services.yaml + README"}
+  docs-high-level-description: {status: todo}
+  docs-installation-instructions: {status: todo}
+  docs-removal-instructions: {status: todo}
+  entity-event-setup: {status: done, comment: "事件订阅在 async_added_to_hass"}
+  entity-unique-id: {status: done}
+  has-entity-name: {status: done}
+  runtime-data: {status: done}
+  test-before-configure: {status: exempt, comment: "无外部连接可验证"}
+  test-before-setup: {status: exempt, comment: "无外部连接"}
+  unique-config-entry: {status: done, comment: "single_config_entry: true"}
+  # ── Silver ──
+  action-exceptions: {status: todo}
+  config-entry-unloading: {status: done}
+  entity-unavailable: {status: done}
+  log-when-unavailable: {status: exempt}
+  parallel-updates: {status: done, comment: "PARALLEL_UPDATES = 0"}
+  reauthentication-flow: {status: exempt, comment: "无凭证"}
+  test-coverage: {status: todo}
+  # ── Gold ──
+  devices: {status: done}
+  diagnostics: {status: done}
+  discovery: {status: done, comment: "本身即发现聚合器"}
+  discovery-update-info: {status: exempt}
+  dynamic-devices: {status: done, comment: "设备随发现动态出现"}
+  entity-category: {status: done, comment: "诊断类"}
+  entity-device-class: {status: exempt}
+  entity-translations: {status: done, comment: "translation_key + strings entity 段"}
+  icon-translations: {status: done}
+  repair-issues: {status: done, comment: "新设备走 issue_registry"}
+  stale-devices: {status: todo}
+  reconfiguration-flow: {status: todo}
+  exception-translations: {status: todo}
+  entity-disabled-by-default: {status: exempt}
+  docs-data-update: {status: todo}
+  docs-examples: {status: todo}
+  docs-known-limitations: {status: todo}
+  docs-supported-devices: {status: todo}
+  docs-supported-functions: {status: todo}
+  docs-troubleshooting: {status: todo}
+  docs-use-cases: {status: todo}
+  # ── Platinum ──
+  async-dependency: {status: todo}
+  inject-websession: {status: exempt, comment: "无直接网络请求"}
+  strict-typing: {status: todo}
