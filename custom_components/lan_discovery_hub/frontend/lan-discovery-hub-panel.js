@@ -536,14 +536,8 @@ class LanDiscoveryHubPanel extends HTMLElement {
       location.href = "/config/integrations";
       return undefined;
     }
-    if (!device) return undefined;
-    if (act === "configure") return this._configure(device);
-    if (act === "rename") return this._rename(device);
-    if (act === "install") return this._install(device);
-    if (act === "manual") return this._manual(device);
-    if (act === "ack") return this._acknowledge(device);
-    if (act === "forget") return this._forget(device);
-    if (act === "restore") return this._restore(device);
+    // Dialog buttons carry no device id, so they must be handled before the
+    // guard below - otherwise every modal button is a no-op.
     if (act === "confirm-cancel") return this._closeAsk();
     if (act === "confirm-ok") {
       const action = this._confirm?.onConfirm;
@@ -553,6 +547,15 @@ class LanDiscoveryHubPanel extends HTMLElement {
     }
     if (act === "rename-cancel") return this._cancelRename();
     if (act === "rename-commit") return this._commitRename();
+
+    if (!device) return undefined;
+    if (act === "configure") return this._configure(device);
+    if (act === "rename") return this._rename(device);
+    if (act === "install") return this._install(device);
+    if (act === "manual") return this._manual(device);
+    if (act === "ack") return this._acknowledge(device);
+    if (act === "forget") return this._forget(device);
+    if (act === "restore") return this._restore(device);
     return undefined;
   }
 
