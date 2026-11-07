@@ -135,3 +135,7 @@ class BleScanner:
             if len(out) >= MAX_DEVICES:
                 break
         return out
+
+    def active_keys(self) -> set[str]:
+        """Service keys for the advertisements seen in the last snapshot."""
+        return {obs.service_key for obs in self.snapshot()}

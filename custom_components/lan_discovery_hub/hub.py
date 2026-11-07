@@ -242,6 +242,12 @@ class DiscoveryHub:
         async with self._scan_lock:
             self.scanning = True
             try:
+                # Our entry can be set up before the mqtt/bluetooth integrations
+                # finish; retry each round instead of staying dead until restart.
+                if self._mqtt is not None and not self._mqtt.available:
+                    await self._mqtt.async_start()
+                if self._ble is not None and not self._ble.available:
+                    await self._ble.async_start()
                 if SOURCE_ARP in self._sources or SOURCE_PROBE in self._sources:
                     await self._async_collect_arp()
                 if self._ssdp is not None:
@@ -252,6 +258,7 @@ class DiscoveryHub:
                     await self._async_probe_known()
                 await self._async_collect_ble()
                 await self._async_collect_mqtt()
+                self._async_prune_channels()
             except Exception as err:  # noqa: BLE001 - a broken channel must not kill the loop
                 _LOGGER.exception("扫描出错: %s", err)
             finally:
@@ -271,6 +278,15 @@ class DiscoveryHub:
         # back up, otherwise the ledger stays silent until something new shows
         # up. The same notification id means this updates rather than stacks.
         self._schedule_notification()
+
+    def _async_prune_channels(self) -> None:
+        """Forget records that only a push channel ever saw and that channel dropped."""
+        for scanner, source in ((self._ble, SOURCE_BLE), (self._mqtt, SOURCE_MQTT)):
+            if scanner is None or not scanner.available:
+                continue
+            removed = self.registry.drop_source_only(source, scanner.active_keys())
+            if removed:
+                _LOGGER.debug("%s 通道已消失 %s 条记录", source, len(removed))
 
     async def _async_collect_ble(self) -> None:
         """Feed BLE advertisements from the shared bluetooth cache."""

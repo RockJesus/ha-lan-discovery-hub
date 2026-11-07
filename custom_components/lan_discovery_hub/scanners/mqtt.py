@@ -195,3 +195,10 @@ class MqttScanner:
             return list(self._entries.values())
         except RuntimeError:  # a message landed while we were copying
             return []
+
+    def active_keys(self) -> set[str]:
+        """Service keys the broker is currently announcing."""
+        try:
+            return {obs.service_key for obs in self._entries.values()}
+        except RuntimeError:  # pragma: no cover - concurrent insert
+            return set()

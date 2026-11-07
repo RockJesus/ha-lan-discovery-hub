@@ -562,6 +562,25 @@ class DeviceRegistry:
                 removed.append(device_id)
         return removed
 
+    def drop_source_only(self, source: str, active_keys: set[str]) -> list[str]:
+        """Drop records seen through one channel only, when that channel no longer lists them.
+
+        Used by the push-style channels (MQTT announcements, BLE advertisements):
+        a device that stopped being announced there should not linger in the
+        ledger just because it was once stored.
+        """
+        removed: list[str] = []
+        for device_id, record in list(self.records.items()):
+            if not record.services:
+                continue
+            if {service.source for service in record.services.values()} != {source}:
+                continue
+            if any(key in active_keys for key in record.services):
+                continue
+            self.remove(device_id)
+            removed.append(device_id)
+        return removed
+
     def remove(self, device_id: str) -> bool:
         """Drop a device and forget its aliases."""
         record = self.records.pop(device_id, None)
