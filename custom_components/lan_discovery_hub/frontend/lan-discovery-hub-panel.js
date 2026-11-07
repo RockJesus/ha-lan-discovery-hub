@@ -286,9 +286,11 @@ class LanDiscoveryHubPanel extends HTMLElement {
           // The websocket schema wants a string; a numeric id is rejected.
           repository_id: String(repositoryId),
         });
-        const installed = info?.installed || info?.installed_version;
-        const available = info?.available || info?.available_version;
-        if (installed && available && installed === available) {
+        // `installed` is a boolean, the version itself is installed_version;
+        // mixing the two makes the comparison never succeed.
+        const installed = info?.installed_version || null;
+        const available = info?.available_version || null;
+        if (installed && (installed === available || info?.status === "pending-restart" || (info?.installed === true && !info?.pending_upgrade))) {
           this._message = `「${label}」已安装，请重启 Home Assistant 后再点「配置」。`;
           this._render();
           return;

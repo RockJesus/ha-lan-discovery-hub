@@ -100,6 +100,10 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.5.1
+
+- **修 0.5.0 的成功判断**：`repository/info` 里的 `installed` 是布尔值，版本号在 `installed_version`；混用之后比较永远不成立，轮询照样走过 24 次也不给结论。现在分开取值，并用 `pending_upgrade` 兜住「已装但待升级」的情形。
+
 ### 0.5.0
 
 - **修 0.4.9 的轮询空转**：`marketplace/repository/info` 的 `repository_id` 必须是字符串，传数字会被拒（`expected str at 'repository_id'`），异常又被静默忽略，于是面板一直停在「正在安装…」。现在统一转字符串再查。
