@@ -234,6 +234,7 @@ class DiscoveryHub:
                 self.scanning = False
                 self.last_scan = _utcnow()
 
+        self.registry.normalize_names()
         removed = self.registry.drop_noise(is_noise_ip)
         if removed:
             _LOGGER.debug("已清理容器网络地址记录 %s 条", len(removed))

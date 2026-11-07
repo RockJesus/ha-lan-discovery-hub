@@ -456,12 +456,18 @@ class DeviceRegistry:
         observation: Observation, record: DeviceRecord | None
     ) -> str:
         """Choose the most human friendly name available."""
-        for candidate in (
-            observation.name,
-            observation.host.split(".")[0] if observation.host else None,
-        ):
-            if candidate and candidate.strip():
-                return candidate.strip()
+        host = observation.host.split(".")[0] if observation.host else None
+        named = observation.name.strip() if observation.name else None
+        # A UUID-looking instance name loses to the announced hostname, which
+        # humans can actually recognise ("rockde-ipad" beats a HomeKit id).
+        best: str | None = None
+        for candidate in (named, host):
+            if not candidate:
+                continue
+            if best is None or _name_quality(candidate) > _name_quality(best):
+                best = candidate
+        if best:
+            return best
         if record is not None and record.name:
             return record.name
         if observation.ip:
@@ -498,6 +504,30 @@ class DeviceRegistry:
             return False
         record.acknowledged = acknowledged
         return True
+
+    def normalize_names(self) -> int:
+        """Re-derive names from everything already known about each device."""
+        changed = 0
+        for record in self.records.values():
+            candidates: list[str] = []
+            if record.host:
+                candidates.append(record.host.split(".")[0])
+            for service in record.services.values():
+                if service.instance:
+                    candidates.append(service.detail)
+                for key in ("friendly_name", "model"):
+                    value = service.props.get(key)
+                    if isinstance(value, str) and value.strip():
+                        candidates.append(value.strip())
+            best, score = record.name, _name_quality(record.name)
+            for candidate in candidates:
+                quality = _name_quality(candidate)
+                if quality > score:
+                    best, score = candidate, quality
+            if score > _name_quality(record.name):
+                record.name = best
+                changed += 1
+        return changed
 
     def drop_noise(self, predicate) -> list[str]:
         """Remove records whose address is not part of the real network."""
