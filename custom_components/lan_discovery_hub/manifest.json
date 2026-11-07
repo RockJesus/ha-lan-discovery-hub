@@ -4,6 +4,9 @@
   "after_dependencies": [
     "ssdp"
   ],
+  "categories": [
+    "computers_network.routers_network"
+  ],
   "codeowners": [
     "@RockJesus"
   ],
