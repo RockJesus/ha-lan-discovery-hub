@@ -560,6 +560,16 @@ class DiscoveryHub:
             "counts": counts,
             "total": len(self.registry.records),
             "sources": self._sources,
+            "channels": {
+                "ble": {
+                    "available": bool(self._ble and self._ble.available),
+                    "reason": self._ble.reason if self._ble else "未启用",
+                },
+                "mqtt": {
+                    "available": bool(self._mqtt and self._mqtt.available),
+                    "reason": self._mqtt.reason if self._mqtt else "未启用",
+                },
+            },
             "scanning": self.scanning,
             "last_scan": self.last_scan,
         }
