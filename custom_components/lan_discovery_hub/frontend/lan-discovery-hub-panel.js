@@ -363,11 +363,35 @@ class LanDiscoveryHubPanel extends HTMLElement {
   }
 
   _serviceSummary(device) {
-    const services = device.services || {};
-    const kinds = Object.values(services)
-      .map((service) => service.kind || service.source)
-      .filter(Boolean);
-    return [...new Set(kinds)].join(", ") || "—";
+    const services = Object.values(device.services || {});
+    const tokens = new Set();
+    const labels = [];
+    for (const service of services) {
+      const source = service.source || "";
+      const kind = service.kind || "";
+      if (source === "mdns") {
+        const name = kind.replace(/^_/, "").replace(/\.(?:_tcp|_udp)\.local\.?$/, "");
+        if (name) tokens.add(name);
+        if (!labels.includes("mDNS")) labels.push("mDNS");
+      } else if (source === "ssdp") {
+        if (!labels.includes("SSDP")) labels.push("SSDP");
+      } else if (source === "probe") {
+        const ports = (service.props && service.props.ports) || [];
+        if (ports.length) tokens.add(`端口 ${ports.slice(0, 3).join("/")}`);
+        if (!labels.includes("端口探测")) labels.push("端口探测");
+      } else if (source === "ble") {
+        if (!labels.includes("蓝牙广播")) labels.push("蓝牙广播");
+      } else if (source === "mqtt") {
+        if (!labels.includes("MQTT")) labels.push("MQTT");
+      } else if (source === "arp") {
+        if (!labels.includes("ARP")) labels.push("ARP");
+      } else if (source === "serial") {
+        if (!labels.includes("串口")) labels.push("串口");
+      }
+    }
+    const head = labels.join(" / ") || "—";
+    const tail = [...tokens].slice(0, 4).join(", ");
+    return tail ? `${head}<div>${tail}</div>` : head;
   }
 
   _actions(device) {
@@ -580,7 +604,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
         <div>${device.ip || `<span class="noip">无 IP</span>`}</div>
         <div class="meta">${device.ip ? (device.mac || device.host || "") : (device.mac || device.detail_line || "")}</div>
       </td>
-      <td class="meta">${this._serviceSummary(device)}<div>${last}</div></td>
+      <td class="meta"><div>${this._serviceSummary(device)}</div><div>${last}</div></td>
       <td>
         <div>${device.integration_name || device.domain || "—"}</div>
         <div class="meta">${device.repo || ""}</div>

@@ -100,6 +100,10 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.6.0
+
+- **协议列改成看得懂的话**：不再直接怼 `advertisement` / `neighbor` / `_mass._tcp.local.`，改为「蓝牙广播」「ARP」「mDNS」「SSDP」「端口探测」「MQTT」这些标签，下面再列短路点（mDNS 服务名、探测到的端口）。
+
 ### 0.5.9
 
 - 只有 ARP 邻居表的设备（`arp:neighbor`）归到「局域网 · ARP 邻居」，不再落进「未分类」。

@@ -23,5 +23,5 @@
   "issue_tracker": "https://github.com/RockJesus/ha-lan-discovery-hub/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.5.9"
+  "version": "0.6.0"
 }
