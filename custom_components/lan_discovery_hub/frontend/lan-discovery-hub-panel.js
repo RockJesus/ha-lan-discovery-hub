@@ -10,7 +10,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
     this._message = "";
     this._filter = "";
     this._showIgnored = false;
-    this._grouped = true;
+    this._grouped = false;
     this._confirm = null;
     this._render();
   }
