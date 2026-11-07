@@ -100,6 +100,13 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.3.9
+
+- 0.3.8 的"按来源层级加权"在真机上反而更糟：Apple TV 的 UPnP friendly name 是默认值 `computer`，
+  HA 主机名是 `74563ca029490000`，两者都被加权成了设备名。改为按"名字本身是否可信"降级：
+  默认名（computer / localhost / device / nas …）与纯 16 进制串一律当噪声（quality=1），
+  其余仍按"被几种协议同时承认"排序。真机结果：`客厅电视` / `Home Assistant` / `FNOS` 三个都正确。
+
 ### 0.3.8
 
 - 命名按"名字来源的层级"加权：宿主名 4、SSDP friendly name 3、常规协议 2、媒体服务实例名 1。

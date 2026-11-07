@@ -88,6 +88,11 @@ def _name_quality(name: str | None) -> int:
         return 1
     if text.lower().endswith(".local"):
         return 2
+    # Defaults that devices ship with say nothing about whose device it is:
+    # an Apple TV's UPnP friendly name is literally "computer", and a Hostname
+    # taken from a random suffix ("74563ca029490000") is equally anonymous.
+    if text.lower() in _JUNK_NAMES or _HEX_ONLY.match(text):
+        return 1
     return 3
 
 
@@ -257,6 +262,19 @@ class DeviceRecord:
 
 
 # How much a protocol's own name is worth when several disagree.
+_JUNK_NAMES: Final = {
+    "computer",
+    "localhost",
+    "unknown",
+    "generic",
+    "device",
+    "default",
+    "home",
+    "server",
+    "nas",
+}
+_HEX_ONLY: Final = re.compile(r"^[0-9a-f]{8,}$", re.IGNORECASE)
+
 _KIND_WEIGHT: Final = {
     "host": 4,
     "ssdp": 3,
@@ -529,34 +547,30 @@ class DeviceRegistry:
         for record in self.records.values():
             # A label several protocols agree on is the device's own name; a
             # media-service instance ("飞牛音乐-Lite") only speaks for itself.
-            # Weighted, not counted: a device-level name (the host label, an
-            # SSDP friendly name) outranks a media-service instance such as
-            # "飞牛音乐-Lite", which only describes one of its services.
-            support: dict[str, int] = {}
+            support: dict[str, set[str]] = {}
             for service in record.services.values():
-                if service.instance and service.detail:
-                    support[service.detail.strip()] = (
-                        support.get(service.detail.strip(), 0) + 1
-                    )
-                weight = _KIND_WEIGHT.get(service.kind, 2)
-                for key in ("friendly_name", "model"):
-                    value = service.props.get(key)
-                    if isinstance(value, str) and value.strip():
-                        support[value.strip()] = support.get(value.strip(), 0) + weight
+                for candidate in (
+                    [service.detail] if service.instance else []
+                ) + [
+                    value
+                    for key in ("friendly_name", "model")
+                    if isinstance((value := service.props.get(key)), str)
+                ]:
+                    if candidate and candidate.strip():
+                        support.setdefault(candidate.strip(), set()).add(service.kind)
             if record.host:
-                label = record.host.split(".")[0]
-                support[label] = support.get(label, 0) + 4
+                support.setdefault(record.host.split(".")[0], set()).add("host")
 
             best = record.name
             score = (
                 _name_quality(record.name),
-                support.get(record.name, 0),
+                len(support.get(record.name, ())),
                 -len(record.name or ""),
             )
             for candidate in support:
                 proposed = (
                     _name_quality(candidate),
-                    support[candidate],
+                    len(support[candidate]),
                     -len(candidate),
                 )
                 if proposed > score:
