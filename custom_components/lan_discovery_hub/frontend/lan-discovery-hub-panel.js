@@ -283,8 +283,8 @@ class LanDiscoveryHubPanel extends HTMLElement {
         th, td { text-align:left; padding:8px 8px; border-bottom:1px solid var(--divider-color);
                  vertical-align: top; overflow-wrap:anywhere; }
         th { color: var(--secondary-text-color); font-weight:500; font-size:12px; }
-        col.c-device { width:26% } col.c-addr { width:15% } col.c-proto { width:23% }
-        col.c-sugg { width:13% } col.c-state { width:9% } col.c-acts { width:17% }
+        col.c-device { width:24% } col.c-addr { width:14% } col.c-proto { width:22% }
+        col.c-sugg { width:13% } col.c-state { width:8% } col.c-acts { width:19% }
         .badge { display:inline-block; color:#fff; border-radius:999px; padding:2px 8px;
                  font-size:11px; white-space:nowrap; }
         .name { font-weight:500; }
