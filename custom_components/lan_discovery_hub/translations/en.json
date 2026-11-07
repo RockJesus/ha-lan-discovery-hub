@@ -1,42 +1,27 @@
 {
+  "title": "LAN Discovery Hub",
   "config": {
     "step": {
       "user": {
-        "description": "One hub per instance. It listens to LAN broadcasts, records every device it sees, and raises a repair issue with a shortcut to the matching integration."
+        "title": "LAN Discovery Hub",
+        "description": "One hub per Home Assistant instance. It browses mDNS, searches SSDP and probes open TCP ports, merges every sighting into one entry per device, and tells you which integration can add it."
       }
     },
     "abort": {
-      "single_instance_allowed": "Only one instance is allowed."
+      "single_instance_allowed": "Only a single instance is allowed."
     }
   },
   "options": {
     "step": {
       "init": {
-        "description": "mDNS service types to ignore (comma separated).",
+        "title": "Scan settings",
+        "description": "Choose which channels to scan. mDNS is passive and cheap, SSDP searches once per round, and TCP probing fills in ports and MAC addresses for devices already seen.",
         "data": {
-          "ignored_types": "Ignored service types"
+          "sources": "Scan channels",
+          "scan_interval": "Seconds between scans",
+          "full_sweep": "Also probe every host in the local /24",
+          "ignored_types": "Ignored mDNS service types (comma separated)"
         }
-      }
-    }
-  },
-  "issues": {
-    "new_device": {
-      "title": "New LAN device found: {name}",
-      "description": "**{name}** announced itself on the network ({service_type}).\n\nSuggested integration: **{integration}** — {state}.\n\nClick **Fix** to continue, or ignore this service type in the hub options if you don't want it."
-    }
-  },
-  "fix_flow": {
-    "abort": {
-      "cannot_start_flow": "Could not open the setup flow for **{integration}**. It may be a custom integration that is not installed yet — install it via HACS first."
-    },
-    "step": {
-      "init": {
-        "title": "Add this device to Home Assistant",
-        "description": "Suggested integration: **{integration}**.\n\nContinue to open its setup flow. Nothing is added automatically — you stay in control."
-      },
-      "confirm": {
-        "title": "Add this device to Home Assistant",
-        "description": "Suggested integration: **{integration}**."
       }
     }
   },
@@ -44,6 +29,28 @@
     "sensor": {
       "discovered_devices": {
         "name": "Discovered devices"
+      }
+    }
+  },
+  "services": {
+    "scan": {
+      "name": "Scan the local network",
+      "description": "Run one discovery round across the enabled channels.",
+      "fields": {
+        "full": {
+          "name": "Full subnet sweep",
+          "description": "Also probe every host in the local /24. This is slow."
+        }
+      }
+    },
+    "acknowledge": {
+      "name": "Acknowledge device",
+      "description": "Mark a discovered device as handled so it is left out of the notification summary.",
+      "fields": {
+        "device_id": {
+          "name": "Device ID",
+          "description": "The device_id from the sidebar panel or the sensor attributes."
+        }
       }
     }
   }

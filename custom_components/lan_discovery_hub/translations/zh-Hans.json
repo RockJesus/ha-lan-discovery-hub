@@ -1,8 +1,10 @@
 {
+  "title": "局域网发现",
   "config": {
     "step": {
       "user": {
-        "description": "每个实例一个中枢。它会监听局域网广播、记录发现的设备，并为每个新设备生成一条带有「前往添加」入口的修复提示。"
+        "title": "局域网发现",
+        "description": "每个 Home Assistant 实例只需一个中枢。它会浏览 mDNS、搜索 SSDP、探测已发现设备的 TCP 端口，把同一台设备的多次公告合并成一条记录，并告诉你用哪个集成可以接入它。"
       }
     },
     "abort": {
@@ -12,38 +14,43 @@
   "options": {
     "step": {
       "init": {
-        "description": "要忽略的 mDNS 服务类型（逗号分隔）。",
+        "title": "扫描设置",
+        "description": "选择要启用的扫描通道。mDNS 是被动监听、开销很小；SSDP 每轮主动搜索一次；TCP 探测用于补上已发现设备的端口与 MAC。",
         "data": {
-          "ignored_types": "忽略的服务类型"
+          "sources": "扫描通道",
+          "scan_interval": "扫描间隔（秒）",
+          "full_sweep": "同时探测本网段 /24 的所有主机",
+          "ignored_types": "忽略的 mDNS 服务类型（逗号分隔）"
         }
-      }
-    }
-  },
-  "issues": {
-    "new_device": {
-      "title": "发现新的局域网设备：{name}",
-      "description": "**{name}** 在网络上广播了自己（{service_type}）。\n\n建议使用的集成：**{integration}** —— {state}。\n\n点击「修复」继续；如果不想看到这类提示，可以在中枢选项里忽略该服务类型。"
-    }
-  },
-  "fix_flow": {
-    "abort": {
-      "cannot_start_flow": "无法打开 **{integration}** 的配置流程。它可能是尚未安装的自定义集成，请先通过 HACS 安装。"
-    },
-    "step": {
-      "init": {
-        "title": "将此设备添加到 Home Assistant",
-        "description": "建议使用的集成：**{integration}**。\n\n继续将打开该集成的配置流程。不会自动添加任何设备，一切由你决定。"
-      },
-      "confirm": {
-        "title": "将此设备添加到 Home Assistant",
-        "description": "建议使用的集成：**{integration}**。"
       }
     }
   },
   "entity": {
     "sensor": {
       "discovered_devices": {
-        "name": "已发现设备"
+        "name": "发现的设备数"
+      }
+    }
+  },
+  "services": {
+    "scan": {
+      "name": "扫描局域网",
+      "description": "立即在已启用的通道上执行一轮扫描。",
+      "fields": {
+        "full": {
+          "name": "全网段扫描",
+          "description": "同时探测本网段 /24 的所有主机，速度较慢。"
+        }
+      }
+    },
+    "acknowledge": {
+      "name": "标记设备已处理",
+      "description": "把某台设备标记为已处理，之后不再出现在汇总通知里。",
+      "fields": {
+        "device_id": {
+          "name": "设备 ID",
+          "description": "侧栏面板或传感器属性里给出的 device_id。"
+        }
       }
     }
   }
