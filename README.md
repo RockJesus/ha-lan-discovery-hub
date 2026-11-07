@@ -100,6 +100,10 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.5.7
+
+- **把 `_2` 后缀改回干净 id**：删掉遗留传感器后，幸存的那个仍带着 Home Assistant 追加的 `_2`。setup 时若原 id 已空出来，自动把实体改名回 `sensor.lan_discovery_hub_discovered_devices`。
+
 ### 0.5.6
 
 - **清理遗留的汇总传感器**：早期版本的 `unique_id` 是 `<entry>_discovered_devices`，现在换成了 `<entry>_devices`，旧实体因此永久显示「不可用」，新实体还被挤成 `_2`。setup 时自动移除这类遗留实体，只保留一个。

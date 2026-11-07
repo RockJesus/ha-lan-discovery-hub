@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
@@ -56,6 +58,19 @@ async def _async_drop_stale_summary_sensors(
         if not entity.unique_id.endswith(("_devices", "_discovered_devices")):
             continue
         registry.async_remove(entity.entity_id)
+
+    # Once the stale entries are gone the surviving entity may still carry the
+    # "_2" suffix Home Assistant appended when the id was taken.
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if entity.unique_id != keep:
+            continue
+        match = re.match(r"^(.*?)_(\d+)$", entity.entity_id)
+        if not match:
+            continue
+        base = match.group(1)
+        if registry.async_get(base) is not None:
+            continue
+        registry.async_update_entity(entity.entity_id, new_entity_id=base)
 
 
 class DiscoveredDevicesSensor(SensorEntity):
