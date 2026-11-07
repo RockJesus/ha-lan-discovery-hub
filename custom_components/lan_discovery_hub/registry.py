@@ -91,20 +91,39 @@ def _name_quality(name: str | None) -> int:
     # Defaults that devices ship with say nothing about whose device it is:
     # an Apple TV's UPnP friendly name is literally "computer", and a Hostname
     # taken from a random suffix ("74563ca029490000") is equally anonymous.
+    bare = text[:-6] if text.lower().endswith(".local") else text
     if (
         text.lower() in _JUNK_NAMES
-        or _HEX_ONLY.match(text)
-        or _HEX_PREFIXED.match(text)
+        or _HEX_ONLY.match(bare)
+        or _HEX_PREFIXED.match(bare)
     ):
         return 1
     return 3
+
+
+def _kind_words(kinds: set[str]) -> set[str]:
+    """Turn service types into the bare words they are built from.
+
+    ``_mass._tcp.local.`` announces itself as ``mass``; that word names the
+    service, not the device.
+    """
+    words: set[str] = set()
+    for kind in kinds:
+        for part in kind.split("."):
+            token = part.strip("_").lower()
+            if token and not token.isdigit():
+                words.add(token)
+    return words
 
 
 def _is_service_word(name: str | None, kinds: set[str]) -> bool:
     """A label that is just the protocol's own service name is not a device name."""
     if not name:
         return False
-    return name.strip().lower() in kinds
+    text = name.strip().lower()
+    if text.endswith(".local"):
+        text = text[:-6]
+    return text in _kind_words(kinds)
 
 
 def _now() -> str:
