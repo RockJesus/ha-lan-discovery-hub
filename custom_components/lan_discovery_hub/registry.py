@@ -509,22 +509,37 @@ class DeviceRegistry:
         """Re-derive names from everything already known about each device."""
         changed = 0
         for record in self.records.values():
-            candidates: list[str] = []
-            if record.host:
-                candidates.append(record.host.split(".")[0])
+            # A label several protocols agree on is the device's own name; a
+            # media-service instance ("飞牛音乐-Lite") only speaks for itself.
+            support: dict[str, set[str]] = {}
             for service in record.services.values():
-                if service.instance:
-                    candidates.append(service.detail)
-                for key in ("friendly_name", "model"):
-                    value = service.props.get(key)
-                    if isinstance(value, str) and value.strip():
-                        candidates.append(value.strip())
-            best, score = record.name, _name_quality(record.name)
-            for candidate in candidates:
-                quality = _name_quality(candidate)
-                if quality > score:
-                    best, score = candidate, quality
-            if score > _name_quality(record.name):
+                for candidate in (
+                    [service.detail] if service.instance else []
+                ) + [
+                    value
+                    for key in ("friendly_name", "model")
+                    if isinstance((value := service.props.get(key)), str)
+                ]:
+                    if candidate and candidate.strip():
+                        support.setdefault(candidate.strip(), set()).add(service.kind)
+            if record.host:
+                support.setdefault(record.host.split(".")[0], set()).add("host")
+
+            best = record.name
+            score = (
+                _name_quality(record.name),
+                len(support.get(record.name, ())),
+                -len(record.name or ""),
+            )
+            for candidate in support:
+                proposed = (
+                    _name_quality(candidate),
+                    len(support[candidate]),
+                    -len(candidate),
+                )
+                if proposed > score:
+                    best, score = candidate, proposed
+            if best != record.name:
                 record.name = best
                 changed += 1
         return changed

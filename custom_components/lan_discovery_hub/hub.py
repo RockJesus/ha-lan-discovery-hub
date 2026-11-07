@@ -413,6 +413,7 @@ class DiscoveryHub:
         self._notify_unsub = None
         from homeassistant.components import persistent_notification  # noqa: PLC0415
 
+        self.registry.normalize_names()
         actionable = [
             record
             for record in self.registry.records.values()
