@@ -9,6 +9,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
     this._busy = false;
     this._message = "";
     this._filter = "";
+    this._showIgnored = false;
     this._render();
   }
 
@@ -29,7 +30,10 @@ class LanDiscoveryHubPanel extends HTMLElement {
   async _load() {
     if (!this._hass) return;
     try {
-      const result = await this._hass.callWS({ type: "lan_discovery_hub/devices" });
+      const result = await this._hass.callWS({
+        type: "lan_discovery_hub/devices",
+        include_ignored: this._showIgnored,
+      });
       this._devices = result.devices || [];
       this._counts = result.counts || {};
       this._meta = result || {};
@@ -65,8 +69,15 @@ class LanDiscoveryHubPanel extends HTMLElement {
   }
 
   async _forget(device) {
-    if (!confirm(`从台账中移除「${device.name}」？下次扫描若再次发现会重新出现。`)) return;
+    if (!confirm(`不再显示「${device.name}」？\n\n它仍会被扫描跟踪，只是从列表里隐藏，随时可在工具栏勾选「显示已忽略」恢复。`)) return;
     await this._call("forget", { device_id: device.device_id });
+    this._message = `已隐藏「${device.name}」，勾选「显示已忽略」可恢复。`;
+    await this._load();
+  }
+
+  async _restore(device) {
+    await this._call("restore", { device_id: device.device_id });
+    this._message = `已恢复「${device.name}」。`;
     await this._load();
   }
 
@@ -77,7 +88,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
         this._message = `已为「${device.integration_name || device.domain}」创建配置流程，正在打开「设备与服务」页…`;
         this._render();
         setTimeout(() => {
-          location.href = "/config/integrations";
+          location.href = `/config/integrations?domain=${encodeURIComponent(device.domain)}`;
         }, 900);
       } else {
         this._message = "该集成当前无法启动配置流程，请到「设备与服务」页手动添加。";
@@ -89,28 +100,43 @@ class LanDiscoveryHubPanel extends HTMLElement {
     }
   }
 
-  async _rename(device) {
-    const current = device.name_override || device.name || "";
-    const typed = prompt(
-      `为这台设备起一个名字${device.name_override ? "（留空恢复自动命名）" : ""}`,
-      current
-    );
-    if (typed === null) return;
+  _rename(device) {
+    // A native prompt() is blocked in the companion app and cannot be styled;
+    // the panel draws its own small dialog instead.
+    this._renaming = device;
+    this._renameDraft = device.name_override || device.name || "";
+    this._render();
+    const field = this.shadowRoot.querySelector("#rename-input");
+    if (field) {
+      field.focus();
+      field.select();
+    }
+  }
+
+  _cancelRename() {
+    this._renaming = null;
+    this._renameDraft = "";
+    this._render();
+  }
+
+  async _commitRename() {
+    const device = this._renaming;
+    if (!device) return;
+    const name = (this._renameDraft || "").trim().slice(0, 64);
+    this._renaming = null;
     try {
       await this._hass.callWS({
         type: "lan_discovery_hub/rename",
         device_id: device.device_id,
-        name: typed.trim(),
+        name,
       });
-      this._message = typed.trim()
-        ? `已把 ${device.device_id} 命名为「${typed.trim()}」。`
+      this._message = name
+        ? `已把「${device.name}」命名为「${name}」，之后不再被自动识别改掉。`
         : "已取消手动命名，恢复自动识别。";
-      this._render();
-      this._load();
     } catch (err) {
       this._message = `改名失败：${err?.message || err}`;
-      this._render();
     }
+    await this._load();
   }
 
   // ------------------------------------------------------------- marketplace
@@ -260,6 +286,10 @@ class LanDiscoveryHubPanel extends HTMLElement {
 
   _actions(device) {
     const parts = [];
+    if (device.ignored) {
+      parts.push(`<button data-act="restore" data-id="${device.device_id}">恢复</button>`);
+      return parts.join("");
+    }
     if (device.state === "available" && device.domain) {
       parts.push(`<button data-act="configure" data-id="${device.device_id}">配置</button>`);
     }
@@ -308,15 +338,26 @@ class LanDiscoveryHubPanel extends HTMLElement {
         th, td { text-align:left; padding:8px 8px; border-bottom:1px solid var(--divider-color);
                  vertical-align: top; overflow-wrap:anywhere; }
         th { color: var(--secondary-text-color); font-weight:500; font-size:12px; }
-        col.c-device { width:24% } col.c-addr { width:14% } col.c-proto { width:22% }
-        col.c-sugg { width:13% } col.c-state { width:8% } col.c-acts { width:19% }
+        col.c-device { width:23% } col.c-addr { width:13% } col.c-proto { width:21% }
+        col.c-sugg { width:12% } col.c-state { width:8% } col.c-acts { width:23% }
         .badge { display:inline-block; color:#fff; border-radius:999px; padding:2px 8px;
                  font-size:11px; white-space:nowrap; }
         .name { font-weight:500; }
         .meta { color: var(--secondary-text-color); font-size:12px; }
         .msg { margin: 8px 0 12px; padding:8px 10px; border-radius:8px; background: var(--secondary-background-color); font-size:13px; }
         .empty { padding: 24px 6px; color: var(--secondary-text-color); }
-        .acts { display:flex; gap:6px; flex-wrap:wrap; }
+        .acts { display:flex; gap:6px; flex-wrap:nowrap; }
+        .acts button { padding: 4px 9px; font-size: 12px; white-space: nowrap; }
+        .modal { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex;
+                 align-items:center; justify-content:center; z-index:9; }
+        .modal .box { background: var(--card-background-color); border-radius:12px; padding:16px;
+                      width:min(420px, 90vw); box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+        .modal h2 { font-size:16px; margin:0 0 10px; font-weight:500; }
+        .modal input { width:100%; box-sizing:border-box; padding:8px 10px; border-radius:8px;
+                       border:1px solid var(--divider-color); background: var(--primary-background-color);
+                       color: var(--primary-text-color); font-size:14px; }
+        .modal .hint { color: var(--secondary-text-color); font-size:12px; margin:8px 0 14px; }
+        .modal .row { display:flex; gap:8px; justify-content:flex-end; }
         .acts button { padding:4px 8px; font-size:12px; white-space:nowrap; }
       </style>
       <h1>局域网发现</h1>
@@ -336,6 +377,10 @@ class LanDiscoveryHubPanel extends HTMLElement {
         <button data-act="scan">重新扫描</button>
         <button data-act="sweep" class="ghost">全网段扫描</button>
         <button data-act="integrations" class="ghost">设备与服务</button>
+        <label class="ignored-toggle" title="把已隐藏的设备也列出来">
+          <input type="checkbox" data-act="toggle-ignored" ${this._showIgnored ? "checked" : ""}>
+          显示已忽略${this._meta?.ignored_count ? `（${this._meta.ignored_count}）` : ""}
+        </label>
       </div>
       ${this._message ? `<div class="msg">${this._message}</div>` : ""}
       ${this._error ? `<div class="msg">读取失败：${this._error}</div>` : ""}
@@ -351,11 +396,48 @@ class LanDiscoveryHubPanel extends HTMLElement {
               <tbody>${rows.map((device) => this._row(device)).join("")}</tbody>
             </table>`
       }
+      ${
+        this._renaming
+          ? `<div class="modal">
+              <div class="box">
+                <h2>为「${this._renaming.name}」起个名字</h2>
+                <input id="rename-input" value="${this._renameDraft}" maxlength="64">
+                <div class="hint">这个名字会永久压过自动识别；留空则恢复自动命名。</div>
+                <div class="row">
+                  <button class="ghost" data-act="rename-cancel">取消</button>
+                  <button class="primary" data-act="rename-commit">确定</button>
+                </div>
+              </div>
+            </div>`
+          : ""
+      }
     `;
 
     this.shadowRoot.querySelectorAll("button[data-act]").forEach((button) => {
       button.addEventListener("click", (event) => this._onAction(event));
     });
+    const toggle = this.shadowRoot.querySelector("input[data-act=toggle-ignored]");
+    if (toggle) {
+      toggle.addEventListener("change", (event) => {
+        this._showIgnored = event.target.checked;
+        this._load();
+      });
+    }
+    const renameField = this.shadowRoot.querySelector("#rename-input");
+    if (renameField) {
+      renameField.addEventListener("input", (event) => {
+        this._renameDraft = event.target.value;
+      });
+      renameField.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          this._commitRename();
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          this._cancelRename();
+        }
+      });
+    }
     const input = this.shadowRoot.querySelector("input[type=search]");
     if (input) {
       input.addEventListener("input", (event) => {
@@ -375,7 +457,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
     const last = device.last_seen ? new Date(device.last_seen).toLocaleString() : "";
     return `<tr>
       <td>
-        <div class="name">${device.name}</div>
+        <div class="name">${device.name}${device.ignored ? ' <span class="badge" style="background:#788">已忽略</span>' : ""}</div>
         <div class="meta">${device.manufacturer || ""} ${device.model || ""}</div>
       </td>
       <td>
@@ -414,6 +496,9 @@ class LanDiscoveryHubPanel extends HTMLElement {
     if (act === "manual") return this._manual(device);
     if (act === "ack") return this._acknowledge(device);
     if (act === "forget") return this._forget(device);
+    if (act === "restore") return this._restore(device);
+    if (act === "rename-cancel") return this._cancelRename();
+    if (act === "rename-commit") return this._commitRename();
     return undefined;
   }
 

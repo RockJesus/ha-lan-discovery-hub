@@ -213,6 +213,7 @@ class DeviceRecord:
     match_source: str | None = None
     acknowledged: bool = False
     name_override: str | None = None
+    ignored: bool = False
     hints: set[str] = field(default_factory=set)
     services: dict[str, ServiceRecord] = field(default_factory=dict)
 
@@ -233,6 +234,7 @@ class DeviceRecord:
             "match_source": self.match_source,
             "acknowledged": self.acknowledged,
             "name_override": self.name_override,
+            "ignored": self.ignored,
             "hints": sorted(self.hints),
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
@@ -261,6 +263,7 @@ class DeviceRecord:
             match_source=data.get("match_source"),
             acknowledged=bool(data.get("acknowledged")),
             name_override=data.get("name_override") or None,
+            ignored=bool(data.get("ignored")),
             hints=set(data.get("hints") or []),
         )
         for key, service in (data.get("services") or {}).items():
@@ -358,6 +361,7 @@ class DeviceRegistry:
         # a nameless device) can only be keyed by its own service label.
         identity = aliases or [f"svc:{observation.service_key}"]
         candidates = {self._index[alias] for alias in aliases if alias in self._index}
+
         candidates.discard(None)
 
         # A matching IP never overrides a contradicting MAC: two different
@@ -653,6 +657,14 @@ class DeviceRegistry:
             self.remove(device_id)
             removed.append(device_id)
         return removed
+
+    def ignore(self, device_id: str, ignored: bool = True) -> bool:
+        """Hide a device from the panel; scans keep refreshing it underneath."""
+        record = self.get(device_id)
+        if record is None:
+            return False
+        record.ignored = ignored
+        return True
 
     def remove(self, device_id: str) -> bool:
         """Drop a device and forget its aliases."""

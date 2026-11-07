@@ -21,6 +21,7 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_acknowledge)
     websocket_api.async_register_command(hass, websocket_rename)
     websocket_api.async_register_command(hass, websocket_forget)
+    websocket_api.async_register_command(hass, websocket_restore)
     websocket_api.async_register_command(hass, websocket_configure)
 
 
@@ -32,7 +33,12 @@ def _hub_or_error(connection: Any, msg: dict[str, Any]) -> Any:
     return hub
 
 
-@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/devices"})
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/devices",
+        vol.Optional("include_ignored", default=False): bool,
+    }
+)
 @websocket_api.async_response
 async def websocket_devices(
     hass: HomeAssistant, connection: Any, msg: dict[str, Any]
@@ -41,7 +47,9 @@ async def websocket_devices(
     hub = _hub_or_error(connection, msg)
     if hub is None:
         return
-    connection.send_result(msg["id"], hub.snapshot())
+    connection.send_result(
+        msg["id"], hub.snapshot(include_ignored=bool(msg.get("include_ignored")))
+    )
 
 
 @websocket_api.websocket_command(
@@ -114,6 +122,24 @@ async def websocket_forget(
     if hub is None:
         return
     success = await hub.async_forget(msg["device_id"])
+    connection.send_result(msg["id"], {"success": success})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/restore",
+        vol.Required("device_id"): str,
+    }
+)
+@websocket_api.async_response
+async def websocket_restore(
+    hass: HomeAssistant, connection: Any, msg: dict[str, Any]
+) -> None:
+    """Bring an ignored device back into the panel."""
+    hub = _hub_or_error(connection, msg)
+    if hub is None:
+        return
+    success = await hub.async_restore(msg["device_id"])
     connection.send_result(msg["id"], {"success": success})
 
 

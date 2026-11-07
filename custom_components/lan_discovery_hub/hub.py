@@ -505,7 +505,9 @@ class DiscoveryHub:
         actionable = [
             record
             for record in self.registry.records.values()
-            if not record.acknowledged and record.state in ACTIONABLE_STATES
+            if not record.acknowledged
+            and not record.ignored
+            and record.state in ACTIONABLE_STATES
         ]
         if not actionable:
             return
@@ -539,7 +541,9 @@ class DiscoveryHub:
         remaining = [
             record
             for record in self.registry.records.values()
-            if not record.acknowledged and record.state in ACTIONABLE_STATES
+            if not record.acknowledged
+            and not record.ignored
+            and record.state in ACTIONABLE_STATES
         ]
         if remaining:
             return
@@ -581,33 +585,48 @@ class DiscoveryHub:
         return changed
 
     async def async_forget(self, device_id: str) -> bool:
-        """Drop a device from the inventory."""
-        removed = self.registry.remove(device_id)
-        if removed:
+        """Hide a device from the panel for good (it stays tracked internally)."""
+        changed = self.registry.ignore(device_id)
+        if changed:
             await self._async_save()
-        return removed
+            self._async_notify()
+        return changed
+
+    async def async_restore(self, device_id: str) -> bool:
+        """Bring an ignored device back into the panel."""
+        changed = self.registry.ignore(device_id, False)
+        if changed:
+            await self._async_save()
+            self._async_notify()
+        return changed
 
     # ------------------------------------------------------------------ views
 
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self, include_ignored: bool = False) -> dict[str, Any]:
         """Return the full inventory plus counters for the panel."""
+        visible = [
+            record
+            for record in self.registry.records.values()
+            if include_ignored or not record.ignored
+        ]
         counts = {
             STATE_CONFIGURED: 0,
             STATE_AVAILABLE: 0,
             STATE_INSTALLABLE: 0,
             STATE_UNKNOWN: 0,
         }
-        for record in self.registry.records.values():
+        for record in visible:
             counts[record.state] = counts.get(record.state, 0) + 1
 
         records = sorted(
-            self.registry.records.values(),
+            visible,
             key=lambda item: (-STATE_ORDER.get(item.state, 0), item.name.lower()),
         )
         return {
             "devices": [record.as_dict() for record in records],
             "counts": counts,
-            "total": len(self.registry.records),
+            "total": len(visible),
+            "ignored_count": sum(1 for r in self.registry.records.values() if r.ignored),
             "sources": self._sources,
             "channels": {
                 "ble": {
