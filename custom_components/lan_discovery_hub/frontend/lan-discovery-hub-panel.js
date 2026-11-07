@@ -10,6 +10,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
     this._message = "";
     this._filter = "";
     this._showIgnored = false;
+    this._grouped = true;
     this._confirm = null;
     this._render();
   }
@@ -333,6 +334,23 @@ class LanDiscoveryHubPanel extends HTMLElement {
     });
   }
 
+  _groupedRows(rows) {
+    const groups = new Map();
+    for (const device of rows) {
+      const key = device.channel_label || "未分类";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(device);
+    }
+    return [...groups.entries()]
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(
+        ([label, items]) =>
+          `<tr class="group"><td colspan="6">${label} · ${items.length} 台</td></tr>` +
+          items.map((device) => this._row(device)).join("")
+      )
+      .join("");
+  }
+
   _badge(device) {
     const map = {
       configured: ["已接入", "#0b8043"],
@@ -411,6 +429,9 @@ class LanDiscoveryHubPanel extends HTMLElement {
         .badge { display:inline-block; color:#fff; border-radius:999px; padding:2px 8px;
                  font-size:11px; white-space:nowrap; }
         .name { font-weight:500; }
+        .noip { color: var(--secondary-text-color); font-size:12px; }
+        tr.group td { background: var(--secondary-background-color); font-weight:500; font-size:12px;
+                      color: var(--secondary-text-color); padding:6px 8px; }
         .meta { color: var(--secondary-text-color); font-size:12px; }
         .msg { margin: 8px 0 12px; padding:8px 10px; border-radius:8px; background: var(--secondary-background-color); font-size:13px; }
         .empty { padding: 24px 6px; color: var(--secondary-text-color); }
@@ -445,6 +466,10 @@ class LanDiscoveryHubPanel extends HTMLElement {
         <button data-act="scan">重新扫描</button>
         <button data-act="sweep" class="ghost">全网段扫描</button>
         <button data-act="integrations" class="ghost">设备与服务</button>
+        <label class="ignored-toggle" title="按发现渠道分组，便于看待没有 IP 的 MQTT / 蓝牙设备">
+          <input type="checkbox" data-act="toggle-grouped" ${this._grouped ? "checked" : ""}>
+          按协议分组
+        </label>
         <label class="ignored-toggle" title="把已隐藏的设备也列出来">
           <input type="checkbox" data-act="toggle-ignored" ${this._showIgnored ? "checked" : ""}>
           显示已忽略${this._meta?.ignored_count ? `（${this._meta.ignored_count}）` : ""}
@@ -461,7 +486,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
                 <col class="c-sugg"><col class="c-state"><col class="c-acts">
               </colgroup>
               <thead><tr><th>设备</th><th>地址</th><th>协议</th><th>建议集成</th><th>状态</th><th>操作</th></tr></thead>
-              <tbody>${rows.map((device) => this._row(device)).join("")}</tbody>
+              <tbody>${this._grouped ? this._groupedRows(rows) : rows.map((device) => this._row(device)).join("")}</tbody>
             </table>`
       }
       ${
@@ -498,6 +523,13 @@ class LanDiscoveryHubPanel extends HTMLElement {
     this.shadowRoot.querySelectorAll("button[data-act]").forEach((button) => {
       button.addEventListener("click", (event) => this._onAction(event));
     });
+    const groupedToggle = this.shadowRoot.querySelector("input[data-act=toggle-grouped]");
+    if (groupedToggle) {
+      groupedToggle.addEventListener("change", (event) => {
+        this._grouped = event.target.checked;
+        this._render();
+      });
+    }
     const toggle = this.shadowRoot.querySelector("input[data-act=toggle-ignored]");
     if (toggle) {
       toggle.addEventListener("change", (event) => {
@@ -540,11 +572,13 @@ class LanDiscoveryHubPanel extends HTMLElement {
     return `<tr>
       <td>
         <div class="name">${device.name}${device.ignored ? ' <span class="badge" style="background:#788">已忽略</span>' : ""}</div>
-        <div class="meta">${device.manufacturer || ""} ${device.model || ""}</div>
+        <div class="meta">${[device.channel_label, device.manufacturer || device.model || device.detail_line]
+          .filter(Boolean)
+          .join(" · ")}</div>
       </td>
       <td>
-        <div>${device.ip || "—"}</div>
-        <div class="meta">${device.mac || device.host || ""}</div>
+        <div>${device.ip || `<span class="noip">无 IP</span>`}</div>
+        <div class="meta">${device.ip ? (device.mac || device.host || "") : (device.mac || device.detail_line || "")}</div>
       </td>
       <td class="meta">${this._serviceSummary(device)}<div>${last}</div></td>
       <td>

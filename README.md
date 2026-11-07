@@ -100,6 +100,10 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.5.8
+
+- **没有 IP 的设备不再只剩一串 MAC**：面板按发现渠道分组（mDNS / SSDP / 探测 / MQTT / 蓝牙 / 串口），地址栏如实写「无 IP」，名字下面补一行可读线索（MQTT 的厂商或型号、蓝牙的信号强度 dBm）。分组开关在工具栏，默认开启。
+
 ### 0.5.7
 
 - **把 `_2` 后缀改回干净 id**：删掉遗留传感器后，幸存的那个仍带着 Home Assistant 追加的 `_2`。setup 时若原 id 已空出来，自动把实体改名回 `sensor.lan_discovery_hub_discovered_devices`。

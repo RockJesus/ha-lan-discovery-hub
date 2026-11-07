@@ -126,6 +126,20 @@ def _is_service_word(name: str | None, kinds: set[str]) -> bool:
     return text in _kind_words(kinds)
 
 
+# Devices that never publish an address are only reachable through one of the
+# hub's own channels; grouping by that channel is what makes them readable.
+CHANNEL_LABELS = {
+    "mdns": "局域网 · mDNS",
+    "ssdp": "局域网 · SSDP",
+    "probe": "局域网 · 探测",
+    "mqtt": "MQTT 设备",
+    "ble": "蓝牙设备",
+    "serial": "串口设备",
+}
+_LAN_CHANNELS = ("mdns", "ssdp", "probe")
+_OFFLAN_CHANNELS = ("mqtt", "ble", "serial")
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
@@ -243,8 +257,43 @@ class DeviceRecord:
     hints: set[str] = field(default_factory=set)
     services: dict[str, ServiceRecord] = field(default_factory=dict)
 
+    @property
+    def channel(self) -> str | None:
+        """The channel this device is (mainly) seen through."""
+        sources = {service.source for service in self.services.values()}
+        order = _LAN_CHANNELS + _OFFLAN_CHANNELS if self.ip else _OFFLAN_CHANNELS + _LAN_CHANNELS
+        for name in order:
+            if name in sources:
+                return name
+        return next(iter(sources), None)
+
+    def _detail_line(self) -> str:
+        """A short, honest description when the name is just a hardware handle."""
+        channel = self.channel
+        if channel == "ble":
+            for service in self.services.values():
+                rssi = service.props.get("rssi")
+                if isinstance(rssi, (int, float)):
+                    return f"信号 {rssi} dBm"
+            return "蓝牙广播"
+        if channel == "mqtt":
+            for service in self.services.values():
+                for key in ("manufacturer", "model"):
+                    value = service.props.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value.strip()
+            return "MQTT 自动发现"
+        if channel == "serial":
+            for service in self.services.values():
+                port = service.detail or service.props.get("port")
+                if isinstance(port, str) and port:
+                    return port
+            return "串口设备"
+        return self.host or ""
+
     def as_dict(self) -> dict[str, Any]:
         """Serialize for storage and for the websocket API."""
+        channel = self.channel
         return {
             "device_id": self.device_id,
             "name": self.name,
@@ -262,6 +311,9 @@ class DeviceRecord:
             "name_override": self.name_override,
             "ignored": self.ignored,
             "hints": sorted(self.hints),
+            "channel": channel,
+            "channel_label": CHANNEL_LABELS.get(channel or "", "未分类"),
+            "detail_line": self._detail_line(),
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
             "services": {
