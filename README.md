@@ -100,6 +100,10 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.5.3
+
+- **修 hassfest 的 DEPENDENCIES 报错**：蓝牙与 MQTT 扫描器通过 `homeassistant.components.bluetooth` / `.mqtt` 懒加载，但 manifest 里没声明依赖，hassfest 因此判红。两路都是可选通道，改用 `after_dependencies` 声明，缺这两个集成时只是通道降级，不会拖住启动。
+
 ### 0.5.2
 
 - **修命名回退**：Matter 这次把 `AE774E6EA872D696-000000000001B669` 当成 announced name 播出来，`_apply()` 写入新名字时没做质量比较，把原来的可读名顶掉了。现在写入前也比质量，纯机器句柄一律降级（最终回落到 IP）。

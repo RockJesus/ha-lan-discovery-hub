@@ -2,6 +2,8 @@
   "domain": "lan_discovery_hub",
   "name": "LAN Discovery Hub",
   "after_dependencies": [
+    "bluetooth",
+    "mqtt",
     "ssdp"
   ],
   "categories": [
@@ -21,5 +23,5 @@
   "issue_tracker": "https://github.com/RockJesus/ha-lan-discovery-hub/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.5.2"
+  "version": "0.5.3"
 }
