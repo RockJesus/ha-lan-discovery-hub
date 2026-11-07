@@ -91,7 +91,11 @@ def _name_quality(name: str | None) -> int:
     # Defaults that devices ship with say nothing about whose device it is:
     # an Apple TV's UPnP friendly name is literally "computer", and a Hostname
     # taken from a random suffix ("74563ca029490000") is equally anonymous.
-    if text.lower() in _JUNK_NAMES or _HEX_ONLY.match(text):
+    if (
+        text.lower() in _JUNK_NAMES
+        or _HEX_ONLY.match(text)
+        or _HEX_PREFIXED.match(text)
+    ):
         return 1
     return 3
 
@@ -278,6 +282,9 @@ _JUNK_NAMES: Final = {
 }
 # Matter/Thread node ids and other machine handles: "AE774E6EA872D696-0000000".
 _HEX_ONLY: Final = re.compile(r"^[0-9a-f]{8,}[-_0-9a-f]*$", re.IGNORECASE)
+# AirPlay hands out instances such as "4d3fa0f5-airplay-5": a hex prefix glued
+# to a service suffix, never a name anybody typed.
+_HEX_PREFIXED: Final = re.compile(r"^[0-9a-f]{8,}-[0-9a-z_-]+$", re.IGNORECASE)
 
 _KIND_WEIGHT: Final = {
     "host": 4,
