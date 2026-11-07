@@ -243,6 +243,10 @@ class DiscoveryHub:
         self.hass.bus.async_fire(
             EVENT_SCAN_FINISHED, {"devices": len(self.registry.records)}
         )
+        # A device found before a restart should still be surfaced once HA is
+        # back up, otherwise the ledger stays silent until something new shows
+        # up. The same notification id means this updates rather than stacks.
+        self._schedule_notification()
 
     async def _async_collect_arp(self) -> None:
         cache = read_arp_cache()

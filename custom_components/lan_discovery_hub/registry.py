@@ -539,6 +539,8 @@ class DeviceRegistry:
                 )
                 if proposed > score:
                     best, score = candidate, proposed
+            if score[0] <= 1 and record.ip and best is not None:
+                best, score = record.ip, (1, 0, 0)
             if best != record.name:
                 record.name = best
                 changed += 1
