@@ -80,7 +80,8 @@ def _name_quality(name: str | None) -> int:
         return 0
     if _IP_LIKE.match(text):
         return 1
-    if _UUID_LIKE.match(text) or text.lower().startswith("upnp"):
+    stripped = re.sub(r"^uuid:", "", text, flags=re.IGNORECASE)
+    if _UUID_LIKE.match(stripped) or text.lower().startswith("upnp"):
         return 1
     if text.lower().endswith(".local"):
         return 2
