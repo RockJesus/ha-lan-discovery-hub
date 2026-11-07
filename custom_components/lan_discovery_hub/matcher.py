@@ -20,7 +20,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from .const import SOURCE_MDNS, SOURCE_SSDP
+from .const import SOURCE_BLE, SOURCE_MDNS, SOURCE_MQTT, SOURCE_SSDP
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -106,6 +106,23 @@ class IntegrationMatcher:
 
     def resolve(self, observation: Any) -> Match | None:
         """Return the integration this observation belongs to."""
+        if observation.source == SOURCE_BLE:
+            domain = observation.props.get("vendor_domain")
+            if domain:
+                return Match(
+                    domain=str(domain),
+                    integration=None,
+                    repo=observation.props.get("vendor_repo"),
+                    source=MATCH_CURATED,
+                )
+            return None
+        if observation.source == SOURCE_MQTT:
+            # Anything announced on the broker is adopted by the MQTT integration
+            # itself; the row is here so the owner can see it before it lands.
+            return Match(
+                domain="mqtt", integration="MQTT 自动认领", repo=None, source=MATCH_CORE
+            )
+
         for layer, entries in (
             (MATCH_USER, self._user),
             (MATCH_CURATED, self._curated),

@@ -30,7 +30,9 @@ from .const import (
     EXTRA_MDNS_TYPES,
     PROBE_PORTS,
     SOURCE_ARP,
+    SOURCE_BLE,
     SOURCE_MDNS,
+    SOURCE_MQTT,
     SOURCE_PROBE,
     SOURCE_SSDP,
     SSDP_TARGETS,
@@ -49,7 +51,9 @@ from .registry import (
     DeviceRegistry,
     Observation,
 )
+from .scanners.ble import BleScanner
 from .scanners.mdns import MdnsScanner
+from .scanners.mqtt import MqttScanner, is_configured as _mqtt_configured
 from .scanners.probe import (
     async_probe_ips,
     async_sweep_subnet,
@@ -98,6 +102,8 @@ class DiscoveryHub:
 
         self._mdns: MdnsScanner | None = None
         self._ssdp: SsdpScanner | None = None
+        self._ble: BleScanner | None = None
+        self._mqtt: MqttScanner | None = None
         self._unsub_interval: Any = None
         self._unsub_first_scan: Any = None
         self._save_unsub: Any = None
@@ -145,6 +151,14 @@ class DiscoveryHub:
                 self.hass, self._async_on_observation, SSDP_TARGETS
             )
 
+        if SOURCE_BLE in self._sources:
+            self._ble = BleScanner(self.hass, self._async_on_observation)
+            await self._ble.async_start()
+
+        if SOURCE_MQTT in self._sources:
+            self._mqtt = MqttScanner(self.hass, self._async_on_observation)
+            await self._mqtt.async_start()
+
         self._unsub_interval = async_track_time_interval(
             self.hass,
             self._async_periodic_scan,
@@ -172,6 +186,14 @@ class DiscoveryHub:
         if self._mdns is not None:
             await self._mdns.async_stop()
             self._mdns = None
+
+        if self._ble is not None:
+            await self._ble.async_stop()
+            self._ble = None
+
+        if self._mqtt is not None:
+            await self._mqtt.async_stop()
+            self._mqtt = None
 
         await self._async_save()
 
@@ -228,6 +250,8 @@ class DiscoveryHub:
                     await self._async_sweep_subnet()
                 if SOURCE_PROBE in self._sources:
                     await self._async_probe_known()
+                await self._async_collect_ble()
+                await self._async_collect_mqtt()
             except Exception as err:  # noqa: BLE001 - a broken channel must not kill the loop
                 _LOGGER.exception("扫描出错: %s", err)
             finally:
@@ -247,6 +271,23 @@ class DiscoveryHub:
         # back up, otherwise the ledger stays silent until something new shows
         # up. The same notification id means this updates rather than stacks.
         self._schedule_notification()
+
+    async def _async_collect_ble(self) -> None:
+        """Feed BLE advertisements from the shared bluetooth cache."""
+        if self._ble is None:
+            return
+        for observation in self._ble.snapshot():
+            await self._async_on_observation(observation)
+
+    async def _async_collect_mqtt(self) -> None:
+        """Feed devices announced on the broker."""
+        if self._mqtt is None:
+            return
+        for observation in self._mqtt.snapshot():
+            identifiers = observation.props.get("identifiers") or []
+            if _mqtt_configured(self.hass, identifiers):
+                observation.props["configured"] = True
+            await self._async_on_observation(observation)
 
     async def _async_collect_arp(self) -> None:
         cache = read_arp_cache()
@@ -354,7 +395,9 @@ class DiscoveryHub:
             return
 
         present = self.matcher.integration_present(self.hass, match.domain)
-        configured = self._async_is_device_configured(record)
+        configured = bool(observation.props.get("configured")) or (
+            self._async_is_device_configured(record)
+        )
         if configured:
             state = STATE_CONFIGURED
         elif present:

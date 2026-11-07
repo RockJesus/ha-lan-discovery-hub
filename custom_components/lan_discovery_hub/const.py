@@ -32,8 +32,26 @@ SOURCE_MDNS: Final = "mdns"
 SOURCE_SSDP: Final = "ssdp"
 SOURCE_PROBE: Final = "probe"
 SOURCE_ARP: Final = "arp"
+SOURCE_BLE: Final = "ble"
+SOURCE_MQTT: Final = "mqtt"
 
-DEFAULT_SOURCES: Final = [SOURCE_MDNS, SOURCE_SSDP, SOURCE_PROBE]
+DEFAULT_SOURCES: Final = [
+    SOURCE_MDNS,
+    SOURCE_SSDP,
+    SOURCE_PROBE,
+    SOURCE_BLE,
+    SOURCE_MQTT,
+]
+
+# Bluetooth company identifiers -> the integration that would adopt the device.
+# Only vendors whose ids are unambiguous are listed; unknown ones stay "unknown"
+# rather than pointing the user at the wrong integration.
+BLE_VENDORS: Final = {
+    0xFE95: ("xiaomi_ble", None, "Xiaomi"),
+    0x0969: ("switchbot", None, "SwitchBot"),
+    0x0499: ("ruuvitag_ble", None, "Ruuvi"),
+    0x0157: ("qingping", None, "Qingping"),
+}
 DEFAULT_SCAN_INTERVAL: Final = 300
 DEFAULT_FULL_SWEEP: Final = False
 DEFAULT_IGNORED_TYPES: Final = [

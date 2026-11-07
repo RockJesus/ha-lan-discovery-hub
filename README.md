@@ -100,6 +100,16 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.3.0
+
+- **蓝牙（BLE）通道**：读 HA 蓝牙管理器里已缓存的广播（本地适配器或 ESPHome 代理都算），
+  按厂商 ID 匹配 `xiaomi_ble` / `switchbot` / `ruuvitag_ble` / `qingping`；只保留带名字或厂商数据的广播，
+  15 分钟前的缓存丢弃，避免手机随机地址堆积。
+- **MQTT discovery 通道**：订阅 broker 上 `<prefix>/<component>/[node]/<object>/config`，
+  把「已在 broker 宣告、HA 还没接手」的设备列出来（Tasmota / Zigbee2MQTT / MQTT 模式 ESPHome 都属于这类）。
+  复用 HA 自己的 broker 连接，不另开客户端、不碰凭据。
+- 两个新通道都并入同一个台账：BLE 用 MAC 与局域网记录自动合并，MQTT 用 `uniq_id` / 设备 identifiers 判定是否已配置。
+
 ### 0.2.7
 
 - SSDP 的复合标识（`uuid:…::upnp:rootdevice`、`urn:schemas-upnp-org:…`）整体算作机器串。
