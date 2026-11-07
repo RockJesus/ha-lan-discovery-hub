@@ -19,6 +19,7 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_devices)
     websocket_api.async_register_command(hass, websocket_scan)
     websocket_api.async_register_command(hass, websocket_acknowledge)
+    websocket_api.async_register_command(hass, websocket_rename)
     websocket_api.async_register_command(hass, websocket_forget)
     websocket_api.async_register_command(hass, websocket_configure)
 
@@ -76,6 +77,25 @@ async def websocket_acknowledge(
     if hub is None:
         return
     success = await hub.async_acknowledge(msg["device_id"])
+    connection.send_result(msg["id"], {"success": success})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/rename",
+        vol.Required("device_id"): str,
+        vol.Optional("name", default=""): str,
+    }
+)
+@websocket_api.async_response
+async def websocket_rename(
+    hass: HomeAssistant, connection: Any, msg: dict[str, Any]
+) -> None:
+    """Pin a name the user chose; an empty name restores automatic naming."""
+    hub = _hub_or_error(connection, msg)
+    if hub is None:
+        return
+    success = await hub.async_rename(msg["device_id"], msg.get("name"))
     connection.send_result(msg["id"], {"success": success})
 
 

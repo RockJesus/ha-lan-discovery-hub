@@ -564,6 +564,14 @@ class DiscoveryHub:
             "url": "/config/integrations",
         }
 
+    async def async_rename(self, device_id: str, name: str | None) -> bool:
+        """Pin a user-chosen name to a device and persist it."""
+        changed = self.registry.rename(device_id, name)
+        if changed:
+            await self._async_save()
+            self._async_notify()
+        return changed
+
     async def async_acknowledge(self, device_id: str) -> bool:
         """Mark one device as handled."""
         changed = self.registry.acknowledge(device_id)

@@ -208,6 +208,7 @@ class DeviceRecord:
     repo: str | None = None
     match_source: str | None = None
     acknowledged: bool = False
+    name_override: str | None = None
     hints: set[str] = field(default_factory=set)
     services: dict[str, ServiceRecord] = field(default_factory=dict)
 
@@ -227,6 +228,7 @@ class DeviceRecord:
             "repo": self.repo,
             "match_source": self.match_source,
             "acknowledged": self.acknowledged,
+            "name_override": self.name_override,
             "hints": sorted(self.hints),
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
@@ -254,6 +256,7 @@ class DeviceRecord:
             repo=data.get("repo"),
             match_source=data.get("match_source"),
             acknowledged=bool(data.get("acknowledged")),
+            name_override=data.get("name_override") or None,
             hints=set(data.get("hints") or []),
         )
         for key, service in (data.get("services") or {}).items():
@@ -426,6 +429,7 @@ class DeviceRegistry:
         target.hints |= other.hints
         target.services.update(other.services)
         target.acknowledged = target.acknowledged or other.acknowledged
+        target.name_override = target.name_override or other.name_override
         if STATE_ORDER[other.state] > STATE_ORDER.get(target.state, 0):
             target.state = other.state
             target.domain = other.domain or target.domain
@@ -534,6 +538,17 @@ class DeviceRegistry:
         record.match_source = match_source
         return record
 
+    def rename(self, device_id: str, name: str | None) -> bool:
+        """Pin a name to a device (empty clears it)."""
+        record = self.get(device_id)
+        if record is None:
+            return False
+        clean = (name or "").strip()[:64]
+        record.name_override = clean or None
+        if clean:
+            record.name = clean
+        return True
+
     def acknowledge(self, device_id: str, acknowledged: bool = True) -> bool:
         """Mark a device as acknowledged by the user."""
         record = self.records.get(device_id)
@@ -546,6 +561,14 @@ class DeviceRegistry:
         """Re-derive names from everything already known about each device."""
         changed = 0
         for record in self.records.values():
+            # A name the owner typed always wins: on some boxes two device-level
+            # names are equally valid ("fnos" vs a music-server's own label) and
+            # no heuristic can pick for them.
+            if record.name_override:
+                if record.name != record.name_override:
+                    record.name = record.name_override
+                    changed += 1
+                continue
             # A label several protocols agree on is the device's own name; a
             # media-service instance ("飞牛音乐-Lite") only speaks for itself.
             support: dict[str, set[str]] = {}

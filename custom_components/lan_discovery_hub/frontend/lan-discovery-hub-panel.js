@@ -89,6 +89,30 @@ class LanDiscoveryHubPanel extends HTMLElement {
     }
   }
 
+  async _rename(device) {
+    const current = device.name_override || device.name || "";
+    const typed = prompt(
+      `为这台设备起一个名字${device.name_override ? "（留空恢复自动命名）" : ""}`,
+      current
+    );
+    if (typed === null) return;
+    try {
+      await this._hass.callWS({
+        type: "lan_discovery_hub/rename",
+        device_id: device.device_id,
+        name: typed.trim(),
+      });
+      this._message = typed.trim()
+        ? `已把 ${device.device_id} 命名为「${typed.trim()}」。`
+        : "已取消手动命名，恢复自动识别。";
+      this._render();
+      this._load();
+    } catch (err) {
+      this._message = `改名失败：${err?.message || err}`;
+      this._render();
+    }
+  }
+
   // ------------------------------------------------------------- marketplace
 
   _findRepository(list, fullName) {
@@ -251,6 +275,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
     if (!device.acknowledged) {
       parts.push(`<button data-act="ack" data-id="${device.device_id}">已处理</button>`);
     }
+    parts.push(`<button class="ghost" data-act="rename" data-id="${device.device_id}" title="手动命名，之后不再被自动识别改掉">改名</button>`);
     parts.push(`<button class="ghost" data-act="forget" data-id="${device.device_id}">移除</button>`);
     return parts.join("");
   }
@@ -384,6 +409,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
     }
     if (!device) return undefined;
     if (act === "configure") return this._configure(device);
+    if (act === "rename") return this._rename(device);
     if (act === "install") return this._install(device);
     if (act === "manual") return this._manual(device);
     if (act === "ack") return this._acknowledge(device);
