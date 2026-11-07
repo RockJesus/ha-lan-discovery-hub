@@ -135,8 +135,9 @@ CHANNEL_LABELS = {
     "mqtt": "MQTT 设备",
     "ble": "蓝牙设备",
     "serial": "串口设备",
+    "arp": "局域网 · ARP 邻居",
 }
-_LAN_CHANNELS = ("mdns", "ssdp", "probe")
+_LAN_CHANNELS = ("mdns", "ssdp", "probe", "arp")
 _OFFLAN_CHANNELS = ("mqtt", "ble", "serial")
 
 
