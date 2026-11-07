@@ -279,15 +279,20 @@ class LanDiscoveryHubPanel extends HTMLElement {
         button.primary { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: transparent; }
         button.ghost { background: transparent; }
         button[disabled] { opacity:.5; cursor:not-allowed; }
-        table { width:100%; border-collapse: collapse; font-size: 13px; }
-        th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--divider-color); vertical-align: top; }
+        table { width:100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+        th, td { text-align:left; padding:8px 8px; border-bottom:1px solid var(--divider-color);
+                 vertical-align: top; overflow-wrap:anywhere; }
         th { color: var(--secondary-text-color); font-weight:500; font-size:12px; }
-        .badge { display:inline-block; color:#fff; border-radius:999px; padding:2px 8px; font-size:11px; }
+        col.c-device { width:26% } col.c-addr { width:15% } col.c-proto { width:23% }
+        col.c-sugg { width:13% } col.c-state { width:9% } col.c-acts { width:17% }
+        .badge { display:inline-block; color:#fff; border-radius:999px; padding:2px 8px;
+                 font-size:11px; white-space:nowrap; }
         .name { font-weight:500; }
         .meta { color: var(--secondary-text-color); font-size:12px; }
         .msg { margin: 8px 0 12px; padding:8px 10px; border-radius:8px; background: var(--secondary-background-color); font-size:13px; }
         .empty { padding: 24px 6px; color: var(--secondary-text-color); }
         .acts { display:flex; gap:6px; flex-wrap:wrap; }
+        .acts button { padding:4px 8px; font-size:12px; white-space:nowrap; }
       </style>
       <h1>局域网发现</h1>
       <div class="sub">
@@ -313,6 +318,10 @@ class LanDiscoveryHubPanel extends HTMLElement {
         rows.length === 0
           ? `<div class="empty">还没有发现设备。首次扫描在启动约 20 秒后开始，也可以在选项里换扫描通道。</div>`
           : `<table>
+              <colgroup>
+                <col class="c-device"><col class="c-addr"><col class="c-proto">
+                <col class="c-sugg"><col class="c-state"><col class="c-acts">
+              </colgroup>
               <thead><tr><th>设备</th><th>地址</th><th>协议</th><th>建议集成</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>${rows.map((device) => this._row(device)).join("")}</tbody>
             </table>`
