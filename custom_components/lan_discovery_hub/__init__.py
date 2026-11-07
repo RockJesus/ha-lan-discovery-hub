@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import logging
 from pathlib import Path
 
@@ -122,6 +124,18 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
             _LOGGER.debug("注册前端静态目录失败（可能已注册）: %s", err)
         store["static"] = True
 
+    # Bust the browser's module cache on every release: a custom panel's
+    # module_url is a stable path, so without a version the browser keeps
+    # rendering the previous build (observed on a real instance after 0.3.6).
+    version = "0"
+    try:
+        version = json.loads(
+            (Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
+        ).get("version", "0")
+    except Exception:  # noqa: BLE001 - a missing manifest is not fatal here
+        pass
+    module_url = f"{PANEL_MODULE_URL}?v={version}"
+
     try:
         async_register_built_in_panel(
             hass,
@@ -132,7 +146,7 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
             config={
                 "_panel_custom": {
                     "name": PANEL_ELEMENT,
-                    "module_url": PANEL_MODULE_URL,
+                    "module_url": module_url,
                     "embed_iframe": False,
                     "trust_external": False,
                 }
