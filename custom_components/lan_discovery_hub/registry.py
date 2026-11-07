@@ -548,35 +548,45 @@ class DeviceRegistry:
             # A label several protocols agree on is the device's own name; a
             # media-service instance ("飞牛音乐-Lite") only speaks for itself.
             support: dict[str, set[str]] = {}
+            # A name that only ever came from a protocol *instance* ("飞牛音乐
+            # -Lite") describes one service; it must never outrank the name the
+            # device itself carries, or the label flips between scans.
+            instance_only: set[str] = set()
             for service in record.services.values():
+                from_instance = service.instance
                 for candidate in (
-                    [service.detail] if service.instance else []
+                    [service.detail] if from_instance else []
                 ) + [
                     value
                     for key in ("friendly_name", "model")
                     if isinstance((value := service.props.get(key)), str)
                 ]:
                     if candidate and candidate.strip():
-                        support.setdefault(candidate.strip(), set()).add(service.kind)
+                        key = candidate.strip()
+                        support.setdefault(key, set()).add(service.kind)
+                        if from_instance:
+                            instance_only.add(key)
             if record.host:
                 support.setdefault(record.host.split(".")[0], set()).add("host")
 
             best = record.name
             score = (
                 _name_quality(record.name),
+                record.name not in instance_only,
                 len(support.get(record.name, ())),
                 -len(record.name or ""),
             )
             for candidate in support:
                 proposed = (
                     _name_quality(candidate),
+                    candidate not in instance_only,
                     len(support[candidate]),
                     -len(candidate),
                 )
                 if proposed > score:
                     best, score = candidate, proposed
             if score[0] <= 1 and record.ip and best is not None:
-                best, score = record.ip, (1, 0, 0)
+                best, score = record.ip, (1, True, 0, 0)
             if best != record.name:
                 record.name = best
                 changed += 1
