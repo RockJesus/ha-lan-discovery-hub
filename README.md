@@ -100,6 +100,10 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.5.0
+
+- **修 0.4.9 的轮询空转**：`marketplace/repository/info` 的 `repository_id` 必须是字符串，传数字会被拒（`expected str at 'repository_id'`），异常又被静默忽略，于是面板一直停在「正在安装…」。现在统一转字符串再查。
+
 ### 0.4.9
 
 - **安装成功不再等 install 的回复**：真机实测 Marketplace 的 `repository/install` 可以几分钟都不回包（仓库其实已写好），面板会卡在「正在安装…」。现在改为每 15 秒查一次 `repository/info`，看到 `installed == available` 或 `pending-restart` 就给出「已安装，请重启 Home Assistant 后再点「配置」」。

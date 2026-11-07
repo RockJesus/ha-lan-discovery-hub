@@ -283,7 +283,8 @@ class LanDiscoveryHubPanel extends HTMLElement {
       try {
         const info = await this._hass.callWS({
           type: "marketplace/repository/info",
-          repository_id: repositoryId,
+          // The websocket schema wants a string; a numeric id is rejected.
+          repository_id: String(repositoryId),
         });
         const installed = info?.installed || info?.installed_version;
         const available = info?.available || info?.available_version;
