@@ -8,6 +8,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -35,7 +36,26 @@ async def async_setup_entry(
 ) -> None:
     """Set up the summary sensor."""
     hub: DiscoveryHub = entry.runtime_data
+    await _async_drop_stale_summary_sensors(hass, entry)
     async_add_entities([DiscoveredDevicesSensor(hub, entry)])
+
+
+async def _async_drop_stale_summary_sensors(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> None:
+    """Remove summary sensors left behind by earlier unique_id schemes.
+
+    They keep showing up as permanently unavailable entities, and the new one
+    gets an awkward ``_2`` suffix because the old id is still taken.
+    """
+    registry = er.async_get(hass)
+    keep = f"{entry.entry_id}_devices"
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if entity.domain != "sensor" or entity.unique_id == keep:
+            continue
+        if not entity.unique_id.endswith(("_devices", "_discovered_devices")):
+            continue
+        registry.async_remove(entity.entity_id)
 
 
 class DiscoveredDevicesSensor(SensorEntity):
