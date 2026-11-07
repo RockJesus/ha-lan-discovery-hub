@@ -261,19 +261,51 @@ class LanDiscoveryHubPanel extends HTMLElement {
 
     this._message = "正在安装，这一步可能需要几分钟…";
     this._render();
-    try {
-      await this._hass.callWS({
-        type: "marketplace/repository/install",
-        repository: repositoryId,
-      });
-    } catch (err) {
-      this._message = `安装失败：${err?.message || err}。请到 Marketplace 手动安装 ${repo}。`;
-      this._render();
-      return;
-    }
 
-    this._message = `「${device.integration_name || device.domain}」已安装，请重启 Home Assistant 后再点「配置」。`;
-    this._render();
+    // The install command can stay unanswered for minutes even though the
+    // repository is already written to disk, so success is judged from
+    // repository/info, not from the reply.
+    let settled = false;
+    const job = this._hass
+      .callWS({ type: "marketplace/repository/install", repository: repositoryId })
+      .then(() => {
+        settled = true;
+      })
+      .catch((err) => {
+        settled = true;
+        this._message = `安装失败：${err?.message || err}。请到 Marketplace 手动安装 ${repo}。`;
+        this._render();
+      });
+
+    const label = device.integration_name || device.domain;
+    for (let attempt = 0; attempt < 24 && !settled; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 15000));
+      try {
+        const info = await this._hass.callWS({
+          type: "marketplace/repository/info",
+          repository_id: repositoryId,
+        });
+        const installed = info?.installed || info?.installed_version;
+        const available = info?.available || info?.available_version;
+        if (installed && available && installed === available) {
+          this._message = `「${label}」已安装，请重启 Home Assistant 后再点「配置」。`;
+          this._render();
+          return;
+        }
+        if (info?.status === "pending-restart") {
+          this._message = `「${label}」已安装，请重启 Home Assistant 后再点「配置」。`;
+          this._render();
+          return;
+        }
+      } catch (err) {
+        // Keep polling: a transient failure here does not mean install failed.
+      }
+    }
+    if (!this._message.startsWith("安装失败")) {
+      this._message = `「${label}」的安装请求已提交，若几分钟后仍未出现，请到 Marketplace 查看进度。`;
+      this._render();
+    }
+    await job;
   }
 
   // ------------------------------------------------------------------ view

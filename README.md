@@ -100,6 +100,10 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.4.9
+
+- **安装成功不再等 install 的回复**：真机实测 Marketplace 的 `repository/install` 可以几分钟都不回包（仓库其实已写好），面板会卡在「正在安装…」。现在改为每 15 秒查一次 `repository/info`，看到 `installed == available` 或 `pending-restart` 就给出「已安装，请重启 Home Assistant 后再点「配置」」。
+
 ### 0.4.8
 
 - **修 0.4.7 的致命回归**：动作分发里 `if (!device) return` 排在弹窗按钮之前，弹窗的「取消/继续」点了没反应（按钮不带 device_id）。现在弹窗分支前置，取消/继续真正生效。
