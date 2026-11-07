@@ -80,8 +80,11 @@ def _name_quality(name: str | None) -> int:
         return 0
     if _IP_LIKE.match(text):
         return 1
-    stripped = re.sub(r"^uuid:", "", text, flags=re.IGNORECASE)
-    if _UUID_LIKE.match(stripped) or text.lower().startswith("upnp"):
+    # SSDP identifiers look like "uuid:…::upnp:rootdevice" and device types like
+    # "urn:schemas-upnp-org:device:…": a human name never contains a colon.
+    collapsed = text.split("::")[0].lower()
+    stripped = re.sub(r"^uuid:", "", collapsed)
+    if ":" in text or _UUID_LIKE.match(stripped) or "upnp" in collapsed:
         return 1
     if text.lower().endswith(".local"):
         return 2

@@ -100,6 +100,11 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.2.7
+
+- SSDP 的复合标识（`uuid:…::upnp:rootdevice`、`urn:schemas-upnp-org:…`）整体算作机器串。
+  设备名里不会出现冒号，所以带冒号的一律不采用，没真名就显示 IP。
+
 ### 0.2.6
 
 - SSDP 的 `uuid:…` 设备标识符不再被当成可读名字（之前它因带 `uuid:` 前缀绕过了 UUID 判断），
