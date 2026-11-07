@@ -571,6 +571,10 @@ class DiscoveryHub:
     async def async_rename(self, device_id: str, name: str | None) -> bool:
         """Pin a user-chosen name to a device and persist it."""
         changed = self.registry.rename(device_id, name)
+        if not name:
+            # Clearing the override means "back to automatic naming": recompute
+            # now, otherwise the old typed name lingers until the next scan.
+            self.registry.normalize_names()
         if changed:
             await self._async_save()
             self._async_notify()

@@ -10,6 +10,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
     this._message = "";
     this._filter = "";
     this._showIgnored = false;
+    this._confirm = null;
     this._render();
   }
 
@@ -54,8 +55,19 @@ class LanDiscoveryHubPanel extends HTMLElement {
     }
   }
 
-  async _scan(full) {
-    if (full && !confirm("将逐个探测本网段每台主机，耗时约 1–2 分钟。继续？")) return;
+  _scan(full) {
+    if (full) {
+      this._ask(
+        "全网段扫描",
+        "将逐个探测本网段每台主机，耗时约 1–2 分钟，期间面板可能变慢。",
+        () => this._runScan(true)
+      );
+      return;
+    }
+    this._runScan(false);
+  }
+
+  async _runScan(full) {
     this._message = full ? "正在全网段扫描…" : "正在扫描…";
     this._render();
     await this._call("scan", { full: Boolean(full) });
@@ -68,11 +80,16 @@ class LanDiscoveryHubPanel extends HTMLElement {
     await this._load();
   }
 
-  async _forget(device) {
-    if (!confirm(`不再显示「${device.name}」？\n\n它仍会被扫描跟踪，只是从列表里隐藏，随时可在工具栏勾选「显示已忽略」恢复。`)) return;
-    await this._call("forget", { device_id: device.device_id });
-    this._message = `已隐藏「${device.name}」，勾选「显示已忽略」可恢复。`;
-    await this._load();
+  _forget(device) {
+    this._ask(
+      `不再显示「${device.name}」`,
+      "它仍会被扫描跟踪，只是从列表里隐藏；随时可在工具栏勾选「显示已忽略」恢复。",
+      async () => {
+        await this._call("forget", { device_id: device.device_id });
+        this._message = `已隐藏「${device.name}」，勾选「显示已忽略」可恢复。`;
+        await this._load();
+      }
+    );
   }
 
   async _restore(device) {
@@ -88,7 +105,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
         this._message = `已为「${device.integration_name || device.domain}」创建配置流程，正在打开「设备与服务」页…`;
         this._render();
         setTimeout(() => {
-          location.href = `/config/integrations?domain=${encodeURIComponent(device.domain)}`;
+          location.href = "/config/integrations";
         }, 900);
       } else {
         this._message = "该集成当前无法启动配置流程，请到「设备与服务」页手动添加。";
@@ -160,18 +177,34 @@ class LanDiscoveryHubPanel extends HTMLElement {
     );
   }
 
-  async _install(device) {
+  _ask(title, text, onConfirm) {
+    // Native confirm()/prompt() are blocked in the companion app, so every
+    // question this panel asks is drawn by the panel itself.
+    this._confirm = { title, text, onConfirm };
+    this._render();
+  }
+
+  _closeAsk() {
+    this._confirm = null;
+    this._render();
+  }
+
+  _install(device) {
     const repo = device.repo;
     if (!repo) {
       this._message = "这条设备没有已知的第三方仓库地址，只能手动搜索安装。";
       this._render();
       return;
     }
-    const warning =
-      `将从仓库 ${repo} 安装「${device.integration_name || device.domain}」集成。\n\n` +
-      "安装完成后需要重启 Home Assistant 才会生效。是否继续？";
-    if (!confirm(warning)) return;
+    this._ask(
+      `安装「${device.integration_name || device.domain}」`,
+      `将从仓库 ${repo} 安装，安装完成后需要重启 Home Assistant 才会生效。`,
+      () => this._runInstall(device)
+    );
+  }
 
+  async _runInstall(device) {
+    const repo = device.repo;
     this._message = `正在 Marketplace 中查找 ${repo}…`;
     this._render();
 
@@ -397,6 +430,20 @@ class LanDiscoveryHubPanel extends HTMLElement {
             </table>`
       }
       ${
+        this._confirm
+          ? `<div class="modal">
+              <div class="box">
+                <h2>${this._confirm.title}</h2>
+                <div class="hint">${this._confirm.text}</div>
+                <div class="row">
+                  <button class="ghost" data-act="confirm-cancel">取消</button>
+                  <button class="primary" data-act="confirm-ok">继续</button>
+                </div>
+              </div>
+            </div>`
+          : ""
+      }
+      ${
         this._renaming
           ? `<div class="modal">
               <div class="box">
@@ -497,6 +544,13 @@ class LanDiscoveryHubPanel extends HTMLElement {
     if (act === "ack") return this._acknowledge(device);
     if (act === "forget") return this._forget(device);
     if (act === "restore") return this._restore(device);
+    if (act === "confirm-cancel") return this._closeAsk();
+    if (act === "confirm-ok") {
+      const action = this._confirm?.onConfirm;
+      this._confirm = null;
+      this._render();
+      return action ? action() : undefined;
+    }
     if (act === "rename-cancel") return this._cancelRename();
     if (act === "rename-commit") return this._commitRename();
     return undefined;
