@@ -230,6 +230,7 @@ class SsdpScanner:
             manufacturer=headers.get("manufacturer"),
             model=headers.get("model") or headers.get("model_number"),
             hint="upnp",
+            unique_instance=True,
             props={
                 "server": headers.get("server"),
                 "location": headers.get("location"),

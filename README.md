@@ -95,8 +95,24 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 - **没有集成认领的设备无法接入。**HA 没有通用设备驱动，本集成只能把它记进台账。
 - **不做 ICMP 扫段。**容器通常没有 `NET_RAW`，用 TCP connect 代替。
 - **不做 Wi‑Fi 邻近扫描。**系统接口给不到周边 AP/STA 列表；BLE 请用官方 `bluetooth`。
-- **ARP 只能读缓存**，不是主动发现；DHCP 被动嗅探排在 0.2.1。
+- **ARP 只能读缓存**，不是主动发现；DHCP 被动嗅探仍在评估。
 - 内置 `integration_map.json` 只收录已验证的第三方映射，需要持续人工补充。
+
+## 版本记录
+
+### 0.2.1（在真实 HA 2026.11.0 上跑通后修的三处）
+
+- **修聚合崩塌。**0.2.0 里 ARP 邻居行和 TCP 端口探测用的是固定标签
+  （`arp:neighbor:arp`、`probe:tcp:open-ports`），所有设备共用一个识别键，
+  结果把整个网络的设备并成了一条记录。现在只有真正公告的服务实例
+  （mDNS 实例名、SSDP USN）参与识别，合成观测一律按 IP/MAC 匹配。
+- **IP 复用时不再错误合并。**当观测带 MAC、而命中记录是另一个 MAC 时，
+  视为两台设备（DHCP 租约换手），并清掉指向旧地址的过期索引。
+- **面板安装调用修正。**2026.11 的 `marketplace/repository/install`
+  不接受 `warning_accepted` 参数（会直接 `invalid_format`）；
+  同时新增「仓库不在 Marketplace 时先自动添加再安装」的流程。
+- 台账存储换到 `lan_discovery_hub.registry.v3`，0.2.0 那份被错误合并的数据
+  不再沿用，首次启动会重新扫描重建（确认过的「已处理」标记需要重新标）。
 
 ## 故障排查
 

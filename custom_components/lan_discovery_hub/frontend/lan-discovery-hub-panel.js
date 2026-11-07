@@ -136,7 +136,25 @@ class LanDiscoveryHubPanel extends HTMLElement {
       return;
     }
 
-    const entry = this._findRepository(list, repo);
+    let entry = this._findRepository(list, repo);
+    if (!entry) {
+      // The repository is not in the Marketplace yet: adding it is the whole
+      // point of this button, otherwise the user is sent looking for it.
+      this._message = `Marketplace 里还没有 ${repo}，正在添加自定义仓库…`;
+      this._render();
+      try {
+        await this._hass.callWS({
+          type: "marketplace/repositories/add",
+          repository: `https://github.com/${repo}`,
+          category: "integration",
+        });
+        list = await this._hass.callWS({ type: "marketplace/repositories/list" });
+        entry = this._findRepository(list, repo);
+      } catch (err) {
+        console.warn("marketplace add repository failed", err);
+      }
+    }
+
     const repositoryId =
       entry?.repository_id ?? entry?.id ?? entry?.repository?.id ?? null;
     if (!entry || repositoryId === null) {
@@ -164,7 +182,6 @@ class LanDiscoveryHubPanel extends HTMLElement {
       await this._hass.callWS({
         type: "marketplace/repository/install",
         repository: repositoryId,
-        warning_accepted: true,
       });
     } catch (err) {
       this._message = `安装失败：${err?.message || err}。请到 Marketplace 手动安装 ${repo}。`;

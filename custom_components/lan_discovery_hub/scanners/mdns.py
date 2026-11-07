@@ -116,6 +116,7 @@ class MdnsScanner:
                     model=model,
                     hint=hint,
                     props=props,
+                    unique_instance=True,
                 )
             )
         except Exception as err:  # noqa: BLE001 - one bad device must not stop the scan

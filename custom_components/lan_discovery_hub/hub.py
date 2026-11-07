@@ -235,7 +235,7 @@ class DiscoveryHub:
                 Observation(
                     source=SOURCE_ARP,
                     kind="neighbor",
-                    detail="arp",
+                    detail=ip,
                     ip=ip,
                     mac=mac,
                     hint="arp",
@@ -258,7 +258,7 @@ class DiscoveryHub:
                 Observation(
                     source=SOURCE_PROBE,
                     kind="tcp",
-                    detail="open-ports",
+                    detail=ip,
                     ip=ip,
                     hint="tcp",
                     props={"ports": ports},
@@ -279,7 +279,7 @@ class DiscoveryHub:
                 Observation(
                     source=SOURCE_PROBE,
                     kind="tcp",
-                    detail="open-ports",
+                    detail=ip,
                     ip=ip,
                     hint="tcp",
                     props={"ports": ports},

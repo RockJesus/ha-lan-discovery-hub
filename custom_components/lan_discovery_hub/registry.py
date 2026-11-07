@@ -90,6 +90,10 @@ class Observation:
     model: str | None = None
     hint: str | None = None
     props: dict[str, Any] = field(default_factory=dict)
+    # Only a real announced service instance (mDNS instance name) may act as a
+    # merge key. Synthetic sightings (ARP neighbour rows, TCP port probes) reuse
+    # one label for every device, so they must never be matched on.
+    unique_instance: bool = False
 
     @property
     def service_key(self) -> str:
@@ -108,7 +112,8 @@ class Observation:
         host = normalize_host(self.host)
         if host:
             out.append(f"host:{host}")
-        out.append(f"svc:{self.service_key}")
+        if self.unique_instance:
+            out.append(f"svc:{self.service_key}")
         return out
 
 
@@ -122,6 +127,7 @@ class ServiceRecord:
     props: dict[str, Any]
     first_seen: str
     last_seen: str
+    instance: bool = False
 
     @property
     def key(self) -> str:
@@ -137,6 +143,7 @@ class ServiceRecord:
             "props": dict(self.props),
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
+            "instance": self.instance,
         }
 
     @classmethod
@@ -149,6 +156,7 @@ class ServiceRecord:
             props=dict(data.get("props") or {}),
             first_seen=data.get("first_seen") or _now(),
             last_seen=data.get("last_seen") or _now(),
+            instance=bool(data.get("instance")),
         )
 
 
@@ -250,7 +258,7 @@ class DeviceRegistry:
 
     def as_payload(self) -> dict[str, Any]:
         """Serialize for ``Store``."""
-        return {"schema": 2, "devices": [r.as_dict() for r in self.records.values()]}
+        return {"schema": 3, "devices": [r.as_dict() for r in self.records.values()]}
 
     # ------------------------------------------------------------------ index
 
@@ -262,7 +270,8 @@ class DeviceRegistry:
         if record.host:
             self._index[f"host:{record.host}"] = record.device_id
         for service in record.services.values():
-            self._index[f"svc:{service.key}"] = record.device_id
+            if service.instance:
+                self._index[f"svc:{service.key}"] = record.device_id
 
     # ------------------------------------------------------------------ upsert
 
@@ -278,15 +287,28 @@ class DeviceRegistry:
         observation.host = normalize_host(observation.host) or observation.host
 
         aliases = observation.aliases()
-        candidates = {
-            self._index[alias] for alias in aliases if alias in self._index
-        }
+        # An observation with no address identity at all (synthetic sighting on
+        # a nameless device) can only be keyed by its own service label.
+        identity = aliases or [f"svc:{observation.service_key}"]
+        candidates = {self._index[alias] for alias in aliases if alias in self._index}
         candidates.discard(None)
+
+        # A matching IP never overrides a contradicting MAC: two different
+        # physical devices can reuse an address (DHCP lease moved), and folding
+        # them together would silently corrupt the whole inventory.
+        mac = normalize_mac(observation.mac)
+        if mac:
+            candidates = {
+                cid
+                for cid in candidates
+                if cid in self.records
+                and (self.records[cid].mac in (None, mac))
+            }
 
         created = not candidates
         if created:
             record = DeviceRecord(
-                device_id=_stable_id(aliases[0]),
+                device_id=_stable_id(identity[0]),
                 name=self._pick_name(observation, None),
                 first_seen=now,
                 last_seen=now,
@@ -294,7 +316,7 @@ class DeviceRegistry:
             self.records[record.device_id] = record
             target = record
         else:
-            target = self._merge_candidates(candidates, observation)
+            target = self._merge_candidates(candidates, observation, identity)
 
         self._apply(target, observation, now)
         self._reindex(target)
@@ -304,12 +326,13 @@ class DeviceRegistry:
         self,
         candidates: set[str],
         observation: Observation,
+        identity: list[str],
     ) -> DeviceRecord:
         """Merge every candidate record into the strongest one."""
         records = [self.records[cid] for cid in candidates if cid in self.records]
         if not records:
             record = DeviceRecord(
-                device_id=_stable_id(observation.aliases()[0]),
+                device_id=_stable_id(identity[0]),
                 name=self._pick_name(observation, None),
                 first_seen=_now(),
                 last_seen=_now(),
@@ -360,11 +383,14 @@ class DeviceRegistry:
         record.last_seen = max(record.last_seen, now)
         if observation.mac:
             if record.mac and record.mac != observation.mac:
-                # Same IP, conflicting MAC: believe the newest sighting, the
-                # DHCP lease may simply have moved to another device.
                 self._index.pop(f"mac:{record.mac}", None)
             record.mac = observation.mac
         if observation.ip:
+            # The old address may now belong to another device, so the alias
+            # must not keep pointing here.
+            if record.ip and record.ip != observation.ip:
+                if self._index.get(f"ip:{record.ip}") == record.device_id:
+                    self._index.pop(f"ip:{record.ip}", None)
             record.ip = observation.ip
         if observation.host:
             record.host = observation.host
@@ -373,15 +399,26 @@ class DeviceRegistry:
         if observation.hint:
             record.hints.add(observation.hint)
 
+        # One entry per (source, kind) per device: a device that moved to a new
+        # address or re-registered its service keeps a single line, not history.
+        for existing in [
+            key
+            for key, service in record.services.items()
+            if service.source == observation.source and service.kind == observation.kind
+        ]:
+            stale = record.services.pop(existing, None)
+            if stale is not None and stale.instance:
+                if self._index.get(f"svc:{stale.key}") == record.device_id:
+                    self._index.pop(f"svc:{stale.key}", None)
+
         service = ServiceRecord(
             source=observation.source,
             kind=observation.kind,
             detail=observation.detail,
             props=dict(observation.props),
-            first_seen=record.services[observation.service_key].first_seen
-            if observation.service_key in record.services
-            else now,
+            first_seen=now,
             last_seen=now,
+            instance=observation.unique_instance,
         )
         record.services[service.key] = service
 

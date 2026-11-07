@@ -5,10 +5,10 @@ from typing import Final
 DOMAIN: Final = "lan_discovery_hub"
 MANUFACTURER: Final = "LAN Discovery Hub"
 
-# Storage. A new key is used for the v0.2 device-aggregated schema so that
-# upgrading does not try to reinterpret the old per-service records.
+# Storage. Each aggregation schema change gets a fresh key so an upgrade never
+# reinterprets records written by an older, possibly buggy, merge strategy.
 STORAGE_VERSION: Final = 1
-STORAGE_KEY: Final = "lan_discovery_hub.registry.v2"
+STORAGE_KEY: Final = "lan_discovery_hub.registry.v3"
 
 # Options
 CONF_SOURCES: Final = "sources"
