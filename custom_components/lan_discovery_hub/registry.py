@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import hashlib
 import re
-from typing import Any
+from typing import Any, Final
 
 MAC_RE = re.compile(r"^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$")
 IPV4_RE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
@@ -254,6 +254,20 @@ class DeviceRecord:
         for key, service in (data.get("services") or {}).items():
             record.services[key] = ServiceRecord.from_dict(service)
         return record
+
+
+# How much a protocol's own name is worth when several disagree.
+_KIND_WEIGHT: Final = {
+    "host": 4,
+    "ssdp": 3,
+    "mdns": 2,
+    "nut": 2,
+    "smb": 2,
+    "mqtt": 2,
+    "serial": 2,
+    "probe": 2,
+    "ble": 1,
+}
 
 
 class DeviceRegistry:
@@ -515,30 +529,34 @@ class DeviceRegistry:
         for record in self.records.values():
             # A label several protocols agree on is the device's own name; a
             # media-service instance ("飞牛音乐-Lite") only speaks for itself.
-            support: dict[str, set[str]] = {}
+            # Weighted, not counted: a device-level name (the host label, an
+            # SSDP friendly name) outranks a media-service instance such as
+            # "飞牛音乐-Lite", which only describes one of its services.
+            support: dict[str, int] = {}
             for service in record.services.values():
-                for candidate in (
-                    [service.detail] if service.instance else []
-                ) + [
-                    value
-                    for key in ("friendly_name", "model")
-                    if isinstance((value := service.props.get(key)), str)
-                ]:
-                    if candidate and candidate.strip():
-                        support.setdefault(candidate.strip(), set()).add(service.kind)
+                if service.instance and service.detail:
+                    support[service.detail.strip()] = (
+                        support.get(service.detail.strip(), 0) + 1
+                    )
+                weight = _KIND_WEIGHT.get(service.kind, 2)
+                for key in ("friendly_name", "model"):
+                    value = service.props.get(key)
+                    if isinstance(value, str) and value.strip():
+                        support[value.strip()] = support.get(value.strip(), 0) + weight
             if record.host:
-                support.setdefault(record.host.split(".")[0], set()).add("host")
+                label = record.host.split(".")[0]
+                support[label] = support.get(label, 0) + 4
 
             best = record.name
             score = (
                 _name_quality(record.name),
-                len(support.get(record.name, ())),
+                support.get(record.name, 0),
                 -len(record.name or ""),
             )
             for candidate in support:
                 proposed = (
                     _name_quality(candidate),
-                    len(support[candidate]),
+                    support[candidate],
                     -len(candidate),
                 )
                 if proposed > score:

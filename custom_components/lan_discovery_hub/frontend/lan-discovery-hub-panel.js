@@ -237,7 +237,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
   _actions(device) {
     const parts = [];
     if (device.state === "available" && device.domain) {
-      parts.push(`<button data-act="configure" data-id="${device.device_id}">配置接入</button>`);
+      parts.push(`<button data-act="configure" data-id="${device.device_id}">配置</button>`);
     }
     if (device.state === "installable" && device.domain) {
       if (device.repo) {
@@ -249,7 +249,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
       parts.push(`<button data-act="configure" data-id="${device.device_id}" disabled title="没有匹配到任何集成">无法接入</button>`);
     }
     if (!device.acknowledged) {
-      parts.push(`<button data-act="ack" data-id="${device.device_id}">标记已处理</button>`);
+      parts.push(`<button data-act="ack" data-id="${device.device_id}">已处理</button>`);
     }
     parts.push(`<button class="ghost" data-act="forget" data-id="${device.device_id}">移除</button>`);
     return parts.join("");
