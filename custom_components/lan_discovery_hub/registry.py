@@ -503,7 +503,14 @@ class DeviceRegistry:
         record.services[service.key] = service
 
         chosen = self._pick_name(observation, record)
-        if chosen and not record.name_override:
+        # A protocol may announce a machine handle ("AE774E6EA872D696-...")
+        # where it used to announce a hostname; never let that displace the
+        # readable label already on the record.
+        if (
+            chosen
+            and not record.name_override
+            and _name_quality(chosen) > _name_quality(record.name)
+        ):
             record.name = chosen
 
     @staticmethod
