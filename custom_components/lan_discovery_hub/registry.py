@@ -456,7 +456,10 @@ class DeviceRegistry:
         # Names arrive piecemeal (USN first, friendlyName later), so replace a
         # machine-generated label as soon as something readable shows up.
         candidate = DeviceRegistry._pick_name(observation, None)
-        if _name_quality(candidate) > _name_quality(record.name):
+        if (
+            not record.name_override
+            and _name_quality(candidate) > _name_quality(record.name)
+        ):
             record.name = candidate
         if observation.mac:
             if record.mac and record.mac != observation.mac:
@@ -500,7 +503,7 @@ class DeviceRegistry:
         record.services[service.key] = service
 
         chosen = self._pick_name(observation, record)
-        if chosen:
+        if chosen and not record.name_override:
             record.name = chosen
 
     @staticmethod
