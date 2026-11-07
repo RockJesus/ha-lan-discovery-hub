@@ -10,6 +10,17 @@ MANUFACTURER: Final = "LAN Discovery Hub"
 STORAGE_VERSION: Final = 1
 STORAGE_KEY: Final = "lan_discovery_hub.registry.v3"
 
+# Networks that belong to the Home Assistant container itself (supervisor and
+# docker bridges). Devices "found" there are services inside the box, not the
+# user's LAN, so they are skipped instead of polluting the ledger.
+NOISE_IP_NETWORKS: Final = (
+    "172.30.32.0/23",
+    "172.17.0.0/16",
+    "127.0.0.0/8",
+    "169.254.0.0/16",
+)
+
+
 # Options
 CONF_SOURCES: Final = "sources"
 CONF_SCAN_INTERVAL: Final = "scan_interval"

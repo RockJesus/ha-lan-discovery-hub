@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
@@ -21,6 +22,7 @@ from .const import (
     CONF_SOURCES,
     DEFAULT_FULL_SWEEP,
     DEFAULT_IGNORED_TYPES,
+    NOISE_IP_NETWORKS,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SOURCES,
     EVENT_DEVICE_FOUND,
@@ -57,6 +59,18 @@ from .scanners.probe import (
 from .scanners.ssdp import SsdpScanner
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def is_noise_ip(ip: str | None) -> bool:
+    """Return True when the address belongs to the HA container, not the LAN."""
+    if not ip:
+        return False
+    try:
+        address = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return any(address in ipaddress.ip_network(net) for net in NOISE_IP_NETWORKS)
+
 
 NOTIFICATION_ID = "lan_discovery_hub_devices"
 NOTIFY_DELAY = 8
@@ -220,6 +234,10 @@ class DiscoveryHub:
                 self.scanning = False
                 self.last_scan = _utcnow()
 
+        removed = self.registry.drop_noise(is_noise_ip)
+        if removed:
+            _LOGGER.debug("已清理容器网络地址记录 %s 条", len(removed))
+
         await self._async_save()
         self.hass.bus.async_fire(
             EVENT_SCAN_FINISHED, {"devices": len(self.registry.records)}
@@ -231,6 +249,8 @@ class DiscoveryHub:
             _LOGGER.debug("没有可用的 ARP 邻居缓存")
             return
         for ip, mac in cache.items():
+            if is_noise_ip(ip):
+                continue
             await self._async_on_observation(
                 Observation(
                     source=SOURCE_ARP,
@@ -246,7 +266,7 @@ class DiscoveryHub:
         targets = [
             record.ip
             for record in list(self.registry.records.values())
-            if record.ip and not record.ip.startswith("127.")
+            if record.ip and not is_noise_ip(record.ip)
         ]
         if not targets:
             return

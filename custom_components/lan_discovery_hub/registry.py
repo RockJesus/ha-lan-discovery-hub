@@ -67,6 +67,26 @@ def normalize_host(value: Any) -> str | None:
     return value.strip().lower().rstrip(".") or None
 
 
+_UUID_LIKE = re.compile(r"^[0-9a-fA-F-]{20,}$")
+_IP_LIKE = re.compile(r"^[0-9]{1,3}(\.[0-9]{1,3}){3}$")
+
+
+def _name_quality(name: str | None) -> int:
+    """Rank how readable a device name is; higher wins."""
+    if not name:
+        return 0
+    text = name.strip()
+    if not text or text == "未知设备":
+        return 0
+    if _IP_LIKE.match(text):
+        return 1
+    if _UUID_LIKE.match(text) or text.lower().startswith("upnp"):
+        return 1
+    if text.lower().endswith(".local"):
+        return 2
+    return 3
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
@@ -381,6 +401,11 @@ class DeviceRegistry:
     ) -> None:
         """Apply a single observation to ``record``."""
         record.last_seen = max(record.last_seen, now)
+        # Names arrive piecemeal (USN first, friendlyName later), so replace a
+        # machine-generated label as soon as something readable shows up.
+        candidate = DeviceRegistry._pick_name(observation, None)
+        if _name_quality(candidate) > _name_quality(record.name):
+            record.name = candidate
         if observation.mac:
             if record.mac and record.mac != observation.mac:
                 self._index.pop(f"mac:{record.mac}", None)
@@ -431,12 +456,14 @@ class DeviceRegistry:
         observation: Observation, record: DeviceRecord | None
     ) -> str:
         """Choose the most human friendly name available."""
-        if observation.name and observation.name.strip():
-            return observation.name.strip()
+        for candidate in (
+            observation.name,
+            observation.host.split(".")[0] if observation.host else None,
+        ):
+            if candidate and candidate.strip():
+                return candidate.strip()
         if record is not None and record.name:
             return record.name
-        if observation.host:
-            return observation.host.split(".")[0]
         if observation.ip:
             return observation.ip
         return "未知设备"
@@ -471,6 +498,18 @@ class DeviceRegistry:
             return False
         record.acknowledged = acknowledged
         return True
+
+    def drop_noise(self, predicate) -> list[str]:
+        """Remove records whose address is not part of the real network."""
+        removed: list[str] = []
+        for device_id, record in list(self.records.items()):
+            if predicate(record.ip) and not any(
+                service.source in ("mdns", "ssdp")
+                for service in record.services.values()
+            ):
+                self.remove(device_id)
+                removed.append(device_id)
+        return removed
 
     def remove(self, device_id: str) -> bool:
         """Drop a device and forget its aliases."""

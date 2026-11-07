@@ -217,10 +217,9 @@ class SsdpScanner:
         """Turn one SSDP response into an observation."""
         st = headers.get("st") or headers.get("nt") or "ssdp"
         friendly = headers.get("friendly_name")
+        # Only real names are used as a device label; the server banner
+        # ("UPnP devices/1.8.4") is noise that would win over a hostname.
         name = friendly or headers.get("model") or ""
-        if not name:
-            server = headers.get("server") or ""
-            name = f"UPnP {server.split(' ')[-1]}" if server else ""
         observation = Observation(
             source=SOURCE_SSDP,
             kind=st,
