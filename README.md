@@ -100,6 +100,11 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.3.4
+
+- MQTT 台账只收真实设备：`tag`（MQTT 标签扫描器，转发 NFC/二维码扫描）、`device_automation`、`scene`、`script`
+  这类"能力宣告"不再被当成待接入设备。
+
 ### 0.3.3
 
 - **通道晚于本集成就绪时的自愈**：config entry 可能先于 mqtt / bluetooth 完成建立，

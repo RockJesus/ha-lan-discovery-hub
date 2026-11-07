@@ -24,6 +24,10 @@ from ..registry import Observation
 _LOGGER = logging.getLogger(__name__)
 
 MAX_DEVICES = 250
+
+# Components that announce a *capability* rather than a device. A "tag" entry is
+# an MQTT tag scanner (it forwards NFC/QR tag scans), not a box to configure.
+SKIP_COMPONENTS = {"tag", "device_automation", "scene", "script"}
 DISCOVERY_PREFIX_FALLBACK = "homeassistant"
 
 
@@ -73,6 +77,8 @@ def parse_config(topic: str, payload: str | None) -> Observation | None:
     parts = topic.split("/")
     # <prefix>/<component>/<object>/config  or  <prefix>/<component>/<node>/<object>/config
     component = parts[1] if len(parts) > 2 else "?"
+    if component in SKIP_COMPONENTS:
+        return None
     node_id = parts[2] if len(parts) >= 5 else None
     object_id = parts[-2] if len(parts) > 2 else None
 
