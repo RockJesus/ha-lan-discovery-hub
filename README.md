@@ -100,6 +100,11 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.6.1
+
+- **「配置」直接进对应集成的配置入口**：不再跳到「设备与服务」总览页，而是打开 `/config/integrations/integration/<domain>`。该页顶部就是这台设备的「已发现」条目和「添加」按钮，点一下即可进入配置流程。
+- 「安装说明」改成面板内弹窗，并给一个可点的「去 Marketplace」。
+
 ### 0.6.0
 
 - **协议列改成看得懂的话**：不再直接怼 `advertisement` / `neighbor` / `_mass._tcp.local.`，改为「蓝牙广播」「ARP」「mDNS」「SSDP」「端口探测」「MQTT」这些标签，下面再列短路点（mDNS 服务名、探测到的端口）。

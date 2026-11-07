@@ -99,23 +99,19 @@ class LanDiscoveryHubPanel extends HTMLElement {
     await this._load();
   }
 
+  _integrationUrl(domain) {
+    return `/config/integrations/integration/${encodeURIComponent(domain)}`;
+  }
+
   async _configure(device) {
-    try {
-      const result = await this._call("configure", { domain: device.domain });
-      if (result && result.flow_id) {
-        this._message = `已为「${device.integration_name || device.domain}」创建配置流程，正在打开「设备与服务」页…`;
-        this._render();
-        setTimeout(() => {
-          location.href = "/config/integrations";
-        }, 900);
-      } else {
-        this._message = "该集成当前无法启动配置流程，请到「设备与服务」页手动添加。";
-        this._render();
-      }
-    } catch (err) {
-      this._message = `启动配置流程失败：${err && err.message ? err.message : err}`;
-      this._render();
+    // HA 的集成详情页会把这个设备的「已发现」条目和「添加」按钮直接摆在最上面，
+    // 比落到总览页让人自己找强得多。
+    if (device.domain) {
+      location.href = this._integrationUrl(device.domain);
+      return;
     }
+    this._message = "这台设备还没有匹配到集成。";
+    this._render();
   }
 
   _rename(device) {
@@ -178,10 +174,10 @@ class LanDiscoveryHubPanel extends HTMLElement {
     );
   }
 
-  _ask(title, text, onConfirm) {
+  _ask(title, text, onConfirm, confirmLabel) {
     // Native confirm()/prompt() are blocked in the companion app, so every
     // question this panel asks is drawn by the panel itself.
-    this._confirm = { title, text, onConfirm };
+    this._confirm = { title, text, onConfirm, confirmLabel };
     this._render();
   }
 
@@ -521,7 +517,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
                 <div class="hint">${this._confirm.text}</div>
                 <div class="row">
                   <button class="ghost" data-act="confirm-cancel">取消</button>
-                  <button class="primary" data-act="confirm-ok">继续</button>
+                  <button class="primary" data-act="confirm-ok">${this._confirm.confirmLabel || "继续"}</button>
                 </div>
               </div>
             </div>`
@@ -654,10 +650,17 @@ class LanDiscoveryHubPanel extends HTMLElement {
 
   _manual(device) {
     const repo = device.repo;
-    this._message = repo
-      ? `请安装 ${repo}\n方法一：Marketplace 搜索「${device.integration_name || device.domain}」安装；\n方法二：HACS 添加自定义仓库后安装；\n方法三：手动把集成目录放到 custom_components。安装后重启 Home Assistant。`
-      : `没有匹配到已知集成。可以到 Marketplace 按设备品牌/型号搜索，或查看设备文档确认是否已有 Home Assistant 集成。`;
-    this._render();
+    const name = device.integration_name || device.domain || "该设备";
+    this._ask(
+      "安装说明",
+      repo
+        ? `${name} 来自 ${repo}。安装方式：本面板的「安装集成」直接调 Marketplace 安装；也可以到 Marketplace 搜索安装，或用 HACS 添加自定义仓库。安装完成后必须重启 Home Assistant。`
+        : `没有匹配到已知集成。可以到 Marketplace 按设备品牌/型号搜索，或查看设备文档确认是否已有 Home Assistant 集成。`,
+      () => {
+        location.href = "/config/integrations/dashboard";
+      },
+      "去 Marketplace"
+    );
   }
 }
 
