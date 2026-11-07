@@ -100,6 +100,13 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.3.5
+
+- **串口 / USB 适配器通道**：读 `/dev/serial/by-id` 与 `/sys/bus/usb/devices`（只读，不打开端口，
+  避免复位正在工作的协调器），按 by-id 名称与 USB id 认出 Sonoff Zigbee / SkyConnect / ConBee / Aeotec Z-Stick 等，
+  并给出对应的 ZHA / Z-Wave JS。认不出型号的端口照样列出，只是不指定集成。
+- 通道状态同样写进 `channels.serial`，没插适配器时说明是"看不到串口映射"而不是静默无记录。
+
 ### 0.3.4
 
 - MQTT 台账只收真实设备：`tag`（MQTT 标签扫描器，转发 NFC/二维码扫描）、`device_automation`、`scene`、`script`

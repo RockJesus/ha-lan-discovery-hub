@@ -34,6 +34,7 @@ SOURCE_PROBE: Final = "probe"
 SOURCE_ARP: Final = "arp"
 SOURCE_BLE: Final = "ble"
 SOURCE_MQTT: Final = "mqtt"
+SOURCE_SERIAL: Final = "serial"
 
 DEFAULT_SOURCES: Final = [
     SOURCE_MDNS,
@@ -41,11 +42,41 @@ DEFAULT_SOURCES: Final = [
     SOURCE_PROBE,
     SOURCE_BLE,
     SOURCE_MQTT,
+    SOURCE_SERIAL,
 ]
 
 # Bluetooth company identifiers -> the integration that would adopt the device.
 # Only vendors whose ids are unambiguous are listed; unknown ones stay "unknown"
 # rather than pointing the user at the wrong integration.
+# Serial adapter fingerprints, checked in order against the /dev/serial/by-id
+# name (lower-cased). An empty domain means "recognised hardware, unknown
+# integration" — the row still helps, it just does not claim a coordinator.
+SERIAL_HINTS: Final = (
+    ("sonoff_zigbee", "zha", None, "Sonoff Zigbee"),
+    ("skyconnect", "zha", None, "Nabu Casa SkyConnect"),
+    ("conbee", "zha", None, "ConBee"),
+    ("cc2652", "zha", None, "CC2652"),
+    ("cc2531", "zha", None, "CC2531"),
+    ("zigbee", "zha", None, "Zigbee 适配器"),
+    ("z-stick", "zwave_js", None, "Aeotec Z-Stick"),
+    ("zwave", "zwave_js", None, "Z-Wave 适配器"),
+    ("aeotec", "zwave_js", None, "Aeotec"),
+    ("cp210", "", None, "Silicon Labs CP210x"),
+    ("ch340", "", None, "WCH CH340"),
+    ("ch343", "", None, "WCH CH343"),
+    ("espressif", "", None, "Espressif 串口"),
+)
+
+# Fallback when the by-id name carries no model string (unnamed sticks show
+# only "usb-0658_0200-if00"): known USB ids of radio adapters.
+SERIAL_VID_PID: Final = {
+    "0658:0200": ("zwave_js", None, "Aeotec Z-Stick Gen5"),
+    "0658:0280": ("zwave_js", None, "Aeotec Z-Stick 7"),
+    "10c4:ea60": ("", None, "Silicon Labs CP210x"),
+    "1a86:7523": ("", None, "WCH CH340"),
+    "303a:1001": ("", None, "Espressif USB JTAG/serial"),
+}
+
 BLE_VENDORS: Final = {
     0xFE95: ("xiaomi_ble", None, "Xiaomi"),
     0x0969: ("switchbot", None, "SwitchBot"),

@@ -34,6 +34,7 @@ from .const import (
     SOURCE_MDNS,
     SOURCE_MQTT,
     SOURCE_PROBE,
+    SOURCE_SERIAL,
     SOURCE_SSDP,
     SSDP_TARGETS,
     STORAGE_KEY,
@@ -54,6 +55,7 @@ from .registry import (
 from .scanners.ble import BleScanner
 from .scanners.mdns import MdnsScanner
 from .scanners.mqtt import MqttScanner, is_configured as _mqtt_configured
+from .scanners.serial import SerialScanner
 from .scanners.probe import (
     async_probe_ips,
     async_sweep_subnet,
@@ -104,6 +106,7 @@ class DiscoveryHub:
         self._ssdp: SsdpScanner | None = None
         self._ble: BleScanner | None = None
         self._mqtt: MqttScanner | None = None
+        self._serial: SerialScanner | None = None
         self._unsub_interval: Any = None
         self._unsub_first_scan: Any = None
         self._save_unsub: Any = None
@@ -159,6 +162,10 @@ class DiscoveryHub:
             self._mqtt = MqttScanner(self.hass, self._async_on_observation)
             await self._mqtt.async_start()
 
+        if SOURCE_SERIAL in self._sources:
+            self._serial = SerialScanner(self.hass, self._async_on_observation)
+            await self._serial.async_start()
+
         self._unsub_interval = async_track_time_interval(
             self.hass,
             self._async_periodic_scan,
@@ -194,6 +201,10 @@ class DiscoveryHub:
         if self._mqtt is not None:
             await self._mqtt.async_stop()
             self._mqtt = None
+
+        if self._serial is not None:
+            await self._serial.async_stop()
+            self._serial = None
 
         await self._async_save()
 
@@ -248,6 +259,8 @@ class DiscoveryHub:
                     await self._mqtt.async_start()
                 if self._ble is not None and not self._ble.available:
                     await self._ble.async_start()
+                if self._serial is not None and not self._serial.available:
+                    await self._serial.async_start()
                 if SOURCE_ARP in self._sources or SOURCE_PROBE in self._sources:
                     await self._async_collect_arp()
                 if self._ssdp is not None:
@@ -258,6 +271,7 @@ class DiscoveryHub:
                     await self._async_probe_known()
                 await self._async_collect_ble()
                 await self._async_collect_mqtt()
+                await self._async_collect_serial()
                 self._async_prune_channels()
             except Exception as err:  # noqa: BLE001 - a broken channel must not kill the loop
                 _LOGGER.exception("扫描出错: %s", err)
@@ -279,9 +293,20 @@ class DiscoveryHub:
         # up. The same notification id means this updates rather than stacks.
         self._schedule_notification()
 
+    async def _async_collect_serial(self) -> None:
+        """Feed serial/USB adapters mapped into the container."""
+        if self._serial is None:
+            return
+        for observation in self._serial.snapshot():
+            await self._async_on_observation(observation)
+
     def _async_prune_channels(self) -> None:
         """Forget records that only a push channel ever saw and that channel dropped."""
-        for scanner, source in ((self._ble, SOURCE_BLE), (self._mqtt, SOURCE_MQTT)):
+        for scanner, source in (
+            (self._ble, SOURCE_BLE),
+            (self._mqtt, SOURCE_MQTT),
+            (self._serial, SOURCE_SERIAL),
+        ):
             if scanner is None or not scanner.available:
                 continue
             removed = self.registry.drop_source_only(source, scanner.active_keys())
@@ -584,6 +609,10 @@ class DiscoveryHub:
                 "mqtt": {
                     "available": bool(self._mqtt and self._mqtt.available),
                     "reason": self._mqtt.reason if self._mqtt else "未启用",
+                },
+                "serial": {
+                    "available": bool(self._serial and self._serial.available),
+                    "reason": self._serial.reason if self._serial else "未启用",
                 },
             },
             "scanning": self.scanning,

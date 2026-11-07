@@ -129,7 +129,26 @@ def test_ble_merges_with_lan_by_mac() -> None:
     assert record.ip == "192.168.1.99" and record.name == "Mi Band"
 
 
+serial = load("scanners.serial")
+
+
+def test_serial_fingerprints() -> None:
+    cases = {
+        "usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_abc123-if00-port0": "zha",
+        "usb-Nabu_Casa_SkyConnect_v1.0_5e9a1c2b-if00-port0": "zha",
+        "usb-0658_0200-if00": "zwave_js",  # matched by USB id, no model name
+        "usb-Silicon_Labs_CP2102_USB_to_UART_Bridge-if00-port0": "",
+        "usb-Aeotec_Z-Stick_Gen5-if00": "zwave_js",
+    }
+    for by_id, expected in cases.items():
+        assert serial.classify(by_id)[0] == expected, by_id
+    assert serial.pretty_name(
+        "usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_abc123-if00-port0"
+    ).startswith("ITead Sonoff Zigbee")
+
+
 if __name__ == "__main__":
+    test_serial_fingerprints()
     test_mqtt_parse()
     test_ble_vendor()
     test_ble_stale()
