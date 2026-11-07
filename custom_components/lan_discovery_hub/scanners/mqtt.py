@@ -87,10 +87,17 @@ def parse_config(topic: str, payload: str | None) -> Observation | None:
     if not name and object_id:
         name = str(object_id)
 
-    uid = data.get("uniq_id") or data.get("unique_id") or object_id or node_id
+    # Identity is the *device*, not the entity: one physical box publishing
+    # fourteen sensors must be one row. The device identifier (or the node id
+    # when the payload has no device block) is what all entities share.
+    uid = (
+        str(identifiers[0])
+        if identifiers
+        else (node_id or data.get("uniq_id") or data.get("unique_id") or object_id)
+    )
     if not uid:
         return None
-    key = f"{node_id or '-'}:{component}:{uid}"
+    key = f"mqtt:{uid}"
 
     availability = data.get("availability_topic")
     if not availability and isinstance(data.get("availability"), list):

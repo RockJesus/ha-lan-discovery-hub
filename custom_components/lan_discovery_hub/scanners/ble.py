@@ -67,7 +67,18 @@ class BleScanner:
             _LOGGER.debug("蓝牙通道不可用: %s", err)
             return
         self.available = True
-        self.reason = None if scanners else "没有已启用的蓝牙扫描器（适配器或代理）"
+        if scanners:
+            self.reason = None
+        else:
+            try:
+                entries = self.hass.config_entries.async_entries("bluetooth")
+            except Exception:  # noqa: BLE001
+                entries = []
+            self.reason = (
+                f"蓝牙适配器/代理已配置 {len(entries)} 个，但当前没有在线扫描器"
+                if entries
+                else "没有已启用的蓝牙扫描器（未配置适配器或代理）"
+            )
         _LOGGER.debug("蓝牙通道就绪，扫描器 %s 个", len(scanners))
 
     async def async_stop(self) -> None:
