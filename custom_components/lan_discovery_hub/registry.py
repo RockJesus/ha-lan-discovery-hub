@@ -273,7 +273,8 @@ _JUNK_NAMES: Final = {
     "server",
     "nas",
 }
-_HEX_ONLY: Final = re.compile(r"^[0-9a-f]{8,}$", re.IGNORECASE)
+# Matter/Thread node ids and other machine handles: "AE774E6EA872D696-0000000".
+_HEX_ONLY: Final = re.compile(r"^[0-9a-f]{8,}[-_0-9a-f]*$", re.IGNORECASE)
 
 _KIND_WEIGHT: Final = {
     "host": 4,
