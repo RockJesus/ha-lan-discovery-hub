@@ -100,6 +100,13 @@ def _name_quality(name: str | None) -> int:
     return 3
 
 
+def _is_service_word(name: str | None, kinds: set[str]) -> bool:
+    """A label that is just the protocol's own service name is not a device name."""
+    if not name:
+        return False
+    return name.strip().lower() in kinds
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
@@ -506,9 +513,11 @@ class DeviceRegistry:
         # A protocol may announce a machine handle ("AE774E6EA872D696-...")
         # where it used to announce a hostname; never let that displace the
         # readable label already on the record.
+        kinds = {service.kind.lower() for service in record.services.values()}
         if (
             chosen
             and not record.name_override
+            and not _is_service_word(chosen, kinds)
             and _name_quality(chosen) > _name_quality(record.name)
         ):
             record.name = chosen
@@ -614,16 +623,17 @@ class DeviceRegistry:
             if record.host:
                 support.setdefault(record.host.split(".")[0], set()).add("host")
 
+            kinds = {service.kind.lower() for service in record.services.values()}
             best = record.name
             score = (
-                _name_quality(record.name),
+                1 if _is_service_word(record.name, kinds) else _name_quality(record.name),
                 record.name not in instance_only,
                 len(support.get(record.name, ())),
                 -len(record.name or ""),
             )
             for candidate in support:
                 proposed = (
-                    _name_quality(candidate),
+                    1 if _is_service_word(candidate, kinds) else _name_quality(candidate),
                     candidate not in instance_only,
                     len(support[candidate]),
                     -len(candidate),

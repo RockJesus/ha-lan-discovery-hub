@@ -100,6 +100,10 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.5.4
+
+- **名字等于协议服务名的一律降级**：`_mass._tcp.local` 会把实例名播成 `mass`，这同样不是设备名。现在凡是与记录里的 service kind 字面相同的候选都按最低质量处理，最终回落到 IP（写入路径也不会采纳它）。
+
 ### 0.5.3
 
 - **修 hassfest 的 DEPENDENCIES 报错**：蓝牙与 MQTT 扫描器通过 `homeassistant.components.bluetooth` / `.mqtt` 懒加载，但 manifest 里没声明依赖，hassfest 因此判红。两路都是可选通道，改用 `after_dependencies` 声明，缺这两个集成时只是通道降级，不会拖住启动。
