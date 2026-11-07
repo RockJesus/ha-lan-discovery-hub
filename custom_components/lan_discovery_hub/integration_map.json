@@ -1,0 +1,11 @@
+[
+  {
+    "source": "mdns",
+    "kind": "_ewelink._tcp.local.",
+    "name": "*",
+    "domain": "sonoff",
+    "integration": "Sonoff LAN",
+    "repo": "AlexxIT/SonoffLAN",
+    "note": "Sonoff/eWeLink 设备，core 无对应集成，需从 Marketplace/HACS 安装"
+  }
+]

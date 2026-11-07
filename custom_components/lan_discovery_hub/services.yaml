@@ -1,11 +1,22 @@
+scan:
+  name: Scan the local network
+  description: Run one discovery round across the enabled channels.
+  fields:
+    full:
+      name: Full subnet sweep
+      description: Also probe every host in the local /24. This is slow.
+      default: false
+      selector:
+        boolean:
+
 acknowledge:
   name: Acknowledge device
-  description: Mark a discovered LAN device as acknowledged (dismisses its repair issue).
+  description: Mark a discovered device as handled so it is left out of the notification summary.
   fields:
-    device_key:
-      name: Device key
-      description: '"service_type::name" key from the sensor attributes.'
+    device_id:
+      name: Device ID
+      description: The device_id from the sidebar panel or the sensor attributes.
       required: true
-      example: "_http._tcp.local.::My Printer._http._tcp.local."
+      example: 3f7c1a09b2d4
       selector:
         text:

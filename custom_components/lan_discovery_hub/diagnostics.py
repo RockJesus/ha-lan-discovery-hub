@@ -8,7 +8,7 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
-from .discovery import DiscoveryHub
+from .hub import DiscoveryHub
 
 TO_REDACT = {"access_token", "refresh_token", "token", "password", "secret"}
 
@@ -25,5 +25,7 @@ async def async_get_config_entry_diagnostics(
             "options": dict(entry.options),
         },
         "domain": DOMAIN,
-        "discovered_devices": dict(hub.store.data) if hub else {},
+        "scanning": hub.scanning if hub else None,
+        "last_scan": hub.last_scan if hub else None,
+        "inventory": hub.snapshot() if hub else {},
     }

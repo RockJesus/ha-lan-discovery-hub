@@ -1,55 +1,55 @@
 # 质量分级进度（对照 hassfest quality_scale 规则）
 rules:
   # ── Bronze ──
-  action-setup: {status: done}
-  appropriate-polling: {status: done, comment: "推送型，无轮询"}
-  brands: {status: done, comment: "brand/ 自带"}
-  common-modules: {status: done}
+  action-setup: {status: done, comment: "scan / acknowledge 在 async_setup_entry 注册"}
+  appropriate-polling: {status: done, comment: "推（mDNS）+ 拉（SSDP/TCP，默认 300s）组合"}
+  brands: {status: done, comment: "brand/ 自带 icon 与 logo"}
+  common-modules: {status: done, comment: "registry / matcher / scanners 拆分为独立模块"}
   config-flow: {status: done}
   config-flow-test-coverage: {status: todo}
-  dependency-transparency: {status: done, comment: "after_dependencies 声明"}
-  docs-actions: {status: done, comment: "services.yaml + README"}
-  docs-high-level-description: {status: todo}
-  docs-installation-instructions: {status: todo}
+  dependency-transparency: {status: done, comment: "dependencies + after_dependencies 声明"}
+  docs-actions: {status: done, comment: "services.yaml + README 动作说明"}
+  docs-high-level-description: {status: done}
+  docs-installation-instructions: {status: done}
   docs-removal-instructions: {status: todo}
   entity-event-setup: {status: done, comment: "事件订阅在 async_added_to_hass"}
   entity-unique-id: {status: done}
   has-entity-name: {status: done}
-  runtime-data: {status: done}
-  test-before-configure: {status: exempt, comment: "无外部连接可验证"}
-  test-before-setup: {status: exempt, comment: "无外部连接"}
+  runtime-data: {status: done, comment: "entry.runtime_data = hub"}
+  test-before-configure: {status: exempt, comment: "无外部凭证可验证"}
+  test-before-setup: {status: exempt, comment: "扫描失败只在日志告警，不阻塞 setup"}
   unique-config-entry: {status: done, comment: "single_config_entry: true"}
   # ── Silver ──
-  action-exceptions: {status: todo}
-  config-entry-unloading: {status: done}
-  entity-unavailable: {status: done}
-  log-when-unavailable: {status: exempt}
+  action-exceptions: {status: done, comment: "服务在 hub 缺失时告警返回，不抛出"}
+  config-entry-unloading: {status: done, comment: "停扫描器 + 移除面板 + 落盘"}
+  entity-unavailable: {status: todo}
+  log-when-unavailable: {status: todo}
   parallel-updates: {status: done, comment: "PARALLEL_UPDATES = 0"}
   reauthentication-flow: {status: exempt, comment: "无凭证"}
-  test-coverage: {status: todo}
+  test-coverage: {status: todo, comment: "registry 已有独立单测"}
   # ── Gold ──
   devices: {status: done}
   diagnostics: {status: done}
-  discovery: {status: done, comment: "本身即发现聚合器"}
+  discovery: {status: done, comment: "本身即多通道发现聚合器"}
   discovery-update-info: {status: exempt}
-  dynamic-devices: {status: done, comment: "设备随发现动态出现"}
+  dynamic-devices: {status: done, comment: "设备随扫描动态出现"}
   entity-category: {status: done, comment: "诊断类"}
   entity-device-class: {status: exempt}
   entity-translations: {status: done, comment: "translation_key + strings entity 段"}
   icon-translations: {status: done}
-  repair-issues: {status: done, comment: "新设备走 issue_registry"}
+  repair-issues: {status: exempt, comment: "v0.2 弃用 Repairs，改侧栏面板待办 + 汇总通知"}
   stale-devices: {status: todo}
-  reconfiguration-flow: {status: todo}
+  reconfiguration-flow: {status: todo, comment: "选项页覆盖扫描参数，无凭证需重配"}
   exception-translations: {status: todo}
   entity-disabled-by-default: {status: exempt}
   docs-data-update: {status: todo}
   docs-examples: {status: todo}
-  docs-known-limitations: {status: todo}
-  docs-supported-devices: {status: todo}
-  docs-supported-functions: {status: todo}
-  docs-troubleshooting: {status: todo}
-  docs-use-cases: {status: todo}
+  docs-known-limitations: {status: done, comment: "README「已知限制」"}
+  docs-supported-devices: {status: done}
+  docs-supported-functions: {status: done}
+  docs-troubleshooting: {status: done, comment: "README「故障排查」"}
+  docs-use-cases: {status: done}
   # ── Platinum ──
-  async-dependency: {status: todo}
-  inject-websession: {status: exempt, comment: "无直接网络请求"}
+  async-dependency: {status: done, comment: "全链路 async"}
+  inject-websession: {status: done, comment: "SSDP 取描述用 async_get_clientsession"}
   strict-typing: {status: todo}
