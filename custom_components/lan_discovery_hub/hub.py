@@ -41,7 +41,7 @@ from .const import (
     STORAGE_VERSION,
     SWEEP_PORTS,
 )
-from .matcher import IntegrationMatcher
+from .matcher import IntegrationMatcher, Match
 from .registry import (
     STATE_AVAILABLE,
     STATE_CONFIGURED,
@@ -122,6 +122,10 @@ class DiscoveryHub:
             for item in options.get(CONF_IGNORED_TYPES, DEFAULT_IGNORED_TYPES)
         ]
         self._ignored_devices = set(options.get(CONF_IGNORED_DEVICES, []))
+        # Every fingerprint this device has ever shown, keyed by device_id then
+        # domain. A device that advertises several protocols is decided on the
+        # strongest evidence rather than on whichever packet arrived first.
+        self._match_votes: dict[str, dict[str, dict[str, object]]] = {}
         self._full_sweep = bool(options.get(CONF_FULL_SWEEP, DEFAULT_FULL_SWEEP))
 
         self.scanning = False
@@ -430,45 +434,84 @@ class DiscoveryHub:
     def _async_apply_match(
         self, record: DeviceRecord, observation: Observation
     ) -> None:
-        """Store the integration match (never downgrade a stronger match)."""
+        """Fold one fingerprint into the device's evidence set and decide."""
         match = self.matcher.resolve(observation)
         if match is None or not match.domain:
             return
 
-        present = self.matcher.integration_present(self.hass, match.domain)
+        votes = self._match_votes.setdefault(record.device_id, {})
+        entry = votes.get(match.domain)
+        if entry is None:
+            votes[match.domain] = {
+                "match": match,
+                "sources": {observation.source},
+            }
+        else:
+            sources = entry["sources"]
+            assert isinstance(sources, set)
+            sources.add(observation.source)
+            current = entry["match"]
+            assert isinstance(current, Match)
+            # A service type beats a port hint, even if the port arrived first.
+            if current.confidence != "exact" and match.confidence == "exact":
+                entry["match"] = match
+
         configured = bool(observation.props.get("configured")) or (
             self._async_is_device_configured(record)
         )
-        if configured:
-            state = STATE_CONFIGURED
-        elif present:
-            state = STATE_AVAILABLE
-        else:
-            state = STATE_INSTALLABLE
 
-        current_rank = STATE_ORDER.get(record.state, 0)
-        new_rank = STATE_ORDER.get(state, 0)
+        ranked: list[tuple[tuple[int, int, int], str, Match, str, int]] = []
+        for domain, candidate in votes.items():
+            matched = candidate["match"]
+            assert isinstance(matched, Match)
+            sources = candidate["sources"]
+            assert isinstance(sources, set)
+            if configured:
+                state = STATE_CONFIGURED
+            elif self.matcher.integration_present(self.hass, domain):
+                state = STATE_AVAILABLE
+            elif matched.confidence == "exact":
+                state = STATE_INSTALLABLE
+            else:
+                # A port is not enough to tell the owner to install something.
+                state = STATE_UNKNOWN
+            rank = (
+                0 if matched.confidence == "exact" else 1,
+                -STATE_ORDER.get(state, 0),
+                -len(sources),
+            )
+            ranked.append((rank, domain, matched, state, len(sources)))
+
+        if not ranked:
+            return
+        ranked.sort(key=lambda item: item[0])
+        _, domain, matched, state, support = ranked[0]
+        if state == STATE_UNKNOWN and record.domain != domain:
+            # Keep the earlier, more actionable answer instead of replacing it
+            # with a guess that cannot be acted on.
+            return
+
         if (
-            record.domain
-            and record.domain != match.domain
-            and current_rank > new_rank
+            record.domain == domain
+            and record.state == state
+            and record.match_support == support
         ):
-            # A previously resolved, more actionable match wins over a
-            # fingerprint that only maps to a weaker state.
-            return
-        if record.domain == match.domain and current_rank == new_rank:
             return
 
-        display = match.integration or self.matcher.display_name(
-            self.hass, match.domain
+        display = matched.integration or self.matcher.display_name(
+            self.hass, domain
         )
+        if matched.confidence != "exact":
+            display = f"推测 · {display or domain}"
         self.registry.set_match(
             record.device_id,
             state=state,
-            domain=match.domain,
+            domain=domain,
             integration_name=display,
-            repo=match.repo,
-            match_source=match.source,
+            repo=matched.repo,
+            match_source=matched.source,
+            match_evidence=matched.evidence or None,
+            match_support=support,
         )
 
     def _async_is_device_configured(self, record: DeviceRecord) -> bool:

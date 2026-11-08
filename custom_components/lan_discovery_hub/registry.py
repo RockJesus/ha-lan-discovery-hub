@@ -21,6 +21,52 @@ import hashlib
 import re
 from typing import Any, Final
 
+
+# What usually listens on a port. Used purely as a label under a device that
+# has no service type to announce itself with.
+PORT_LABELS: dict[int, str] = {
+    22: "SSH",
+    53: "DNS",
+    80: "HTTP",
+    139: "SMB",
+    443: "HTTPS",
+    445: "SMB 文件共享",
+    554: "RTSP 视频流",
+    631: "IPP 打印",
+    1883: "MQTT",
+    32400: "Plex",
+    3493: "NUT",
+    5000: "Synology DSM",
+    5001: "Synology DSM HTTPS",
+    6053: "ESPHome API",
+    7000: "AirPlay",
+    8008: "Chromecast",
+    8009: "Chromecast",
+    8123: "Home Assistant",
+    9100: "打印服务",
+    49152: "私有端口",
+}
+
+
+
+
+def describe_ports(ports: Any) -> str:
+    """Render a port list with the service that usually owns each port."""
+    """Render a port list with the service that usually owns each port."""
+    if isinstance(ports, (int, float)):
+        ports = [ports]
+    if not isinstance(ports, (list, tuple)):
+        return ""
+    labels: list[str] = []
+    for port in ports:
+        try:
+            number = int(port)
+        except (TypeError, ValueError):
+            continue
+        label = PORT_LABELS.get(number)
+        labels.append(f"{number} {label}" if label else str(number))
+    return " / ".join(labels)
+
 MAC_RE = re.compile(r"^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$")
 IPV4_RE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
 
@@ -252,6 +298,8 @@ class DeviceRecord:
     integration_name: str | None = None
     repo: str | None = None
     match_source: str | None = None
+    match_evidence: str | None = None
+    match_support: int = 0
     acknowledged: bool = False
     name_override: str | None = None
     ignored: bool = False
@@ -290,6 +338,12 @@ class DeviceRecord:
                 if isinstance(port, str) and port:
                     return port
             return "串口设备"
+        if channel == "probe":
+            for service in self.services.values():
+                ports = service.props.get("ports")
+                described = describe_ports(ports)
+                if described:
+                    return f"端口 {described}"
         return self.host or ""
 
     def as_dict(self) -> dict[str, Any]:
@@ -308,6 +362,8 @@ class DeviceRecord:
             "integration_name": self.integration_name,
             "repo": self.repo,
             "match_source": self.match_source,
+            "match_evidence": self.match_evidence,
+            "match_support": self.match_support,
             "acknowledged": self.acknowledged,
             "name_override": self.name_override,
             "ignored": self.ignored,
@@ -340,6 +396,8 @@ class DeviceRecord:
             integration_name=data.get("integration_name"),
             repo=data.get("repo"),
             match_source=data.get("match_source"),
+            match_evidence=data.get("match_evidence"),
+            match_support=int(data.get("match_support") or 0),
             acknowledged=bool(data.get("acknowledged")),
             name_override=data.get("name_override") or None,
             ignored=bool(data.get("ignored")),
@@ -526,6 +584,8 @@ class DeviceRegistry:
             target.integration_name = other.integration_name or target.integration_name
             target.repo = other.repo or target.repo
             target.match_source = other.match_source or target.match_source
+            target.match_evidence = other.match_evidence or target.match_evidence
+            target.match_support = max(target.match_support, other.match_support)
 
     def _apply(
         self, record: DeviceRecord, observation: Observation, now: str
@@ -628,6 +688,8 @@ class DeviceRegistry:
         integration_name: str | None,
         repo: str | None,
         match_source: str | None,
+        match_evidence: str | None = None,
+        match_support: int = 0,
     ) -> DeviceRecord | None:
         """Store the integration match decided by the matcher."""
         record = self.records.get(device_id)
@@ -638,6 +700,8 @@ class DeviceRegistry:
         record.integration_name = integration_name
         record.repo = repo
         record.match_source = match_source
+        record.match_evidence = match_evidence
+        record.match_support = match_support
         return record
 
     def rename(self, device_id: str, name: str | None) -> bool:

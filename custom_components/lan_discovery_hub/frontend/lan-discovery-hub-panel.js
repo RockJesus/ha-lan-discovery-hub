@@ -603,7 +603,11 @@ class LanDiscoveryHubPanel extends HTMLElement {
       <td class="meta"><div>${this._serviceSummary(device)}</div><div>${last}</div></td>
       <td>
         <div>${device.integration_name || device.domain || "—"}</div>
-        <div class="meta">${device.repo || ""}</div>
+        <div class="meta" title="${device.match_evidence || ""}">${
+          device.match_evidence
+            ? `${device.match_evidence}${device.match_support > 1 ? ` · ${device.match_support} 种协议互证` : ""}`
+            : device.repo || ""
+        }</div>
       </td>
       <td>${this._badge(device)}</td>
       <td><div class="acts">${this._actions(device)}</div></td>

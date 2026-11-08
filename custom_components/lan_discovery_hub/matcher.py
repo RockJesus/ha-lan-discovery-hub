@@ -24,6 +24,7 @@ from .const import (
     SOURCE_BLE,
     SOURCE_MDNS,
     SOURCE_MQTT,
+    SOURCE_PROBE,
     SOURCE_SERIAL,
     SOURCE_SSDP,
 )
@@ -45,6 +46,25 @@ class Match:
     integration: str | None
     repo: str | None
     source: str
+    # "exact" comes from a fingerprint the device itself advertised; "weak" is
+    # inferred from an open port and must never drive an install prompt.
+    confidence: str = "exact"
+    evidence: str = ""
+
+
+# Open ports that a device cannot advertise any other way. Only integrations
+# whose setup talks to that port are listed; everything else is a label for the
+# panel, never a suggestion.
+PORT_DOMAIN_HINTS: dict[int, tuple[str, str]] = {
+    3493: ("nut", "NUT 监控服务"),
+    1883: ("mqtt", "MQTT 消息代理"),
+    8883: ("mqtt", "MQTT over TLS"),
+    32400: ("plex", "Plex 媒体服务器"),
+    5000: ("synology_dsm", "Synology DSM"),
+    5001: ("synology_dsm", "Synology DSM (HTTPS)"),
+    6053: ("esphome", "ESPHome 原生 API"),
+}
+
 
 
 def _load_json(path: Path) -> list[dict[str, Any]]:
@@ -120,13 +140,18 @@ class IntegrationMatcher:
                     integration=None,
                     repo=observation.props.get("vendor_repo"),
                     source=MATCH_CURATED,
+                    evidence="设备自报厂商域",
                 )
             return None
         if observation.source == SOURCE_MQTT:
             # Anything announced on the broker is adopted by the MQTT integration
             # itself; the row is here so the owner can see it before it lands.
             return Match(
-                domain="mqtt", integration="MQTT 自动认领", repo=None, source=MATCH_CORE
+                domain="mqtt",
+                integration="MQTT 自动认领",
+                repo=None,
+                source=MATCH_CORE,
+                evidence="MQTT 发现主题",
             )
 
         for layer, entries in (
@@ -141,6 +166,38 @@ class IntegrationMatcher:
             return self._match_mdns_core(observation)
         if observation.source == SOURCE_SSDP:
             return self._match_ssdp_core(observation)
+        if observation.source == SOURCE_PROBE:
+            return self._match_ports(observation)
+        return None
+
+    @staticmethod
+    def _match_ports(observation: Any) -> Match | None:
+        """Infer an integration from the ports a probe found.
+
+        A port is a much weaker signal than a service type, so the result is
+        marked ``weak``: it may name a suggestion in the panel but is never
+        allowed to trigger an install.
+        """
+        ports = observation.props.get("ports")
+        if not isinstance(ports, (list, tuple)):
+            return None
+        for port in ports:
+            try:
+                number = int(port)
+            except (TypeError, ValueError):
+                continue
+            hint = PORT_DOMAIN_HINTS.get(number)
+            if hint is None:
+                continue
+            domain, label = hint
+            return Match(
+                domain=domain,
+                integration=None,
+                repo=None,
+                source=MATCH_CURATED,
+                confidence="weak",
+                evidence=f"端口 {number}（{label}）",
+            )
         return None
 
     def _match_mdns_core(self, observation: Any) -> Match | None:
@@ -156,7 +213,13 @@ class IntegrationMatcher:
                 continue
             if not self._props_match(matcher.get("properties"), observation.props):
                 continue
-            return Match(domain=domain, integration=None, repo=None, source=MATCH_CORE)
+            return Match(
+                domain=domain,
+                integration=None,
+                repo=None,
+                source=MATCH_CORE,
+                evidence=f"mDNS {observation.kind}",
+            )
         return None
 
     def _match_ssdp_core(self, observation: Any) -> Match | None:
@@ -175,7 +238,11 @@ class IntegrationMatcher:
                 continue
             if self._ssdp_matcher_matches(matcher, headers):
                 return Match(
-                    domain=domain, integration=None, repo=None, source=MATCH_CORE
+                    domain=domain,
+                    integration=None,
+                    repo=None,
+                    source=MATCH_CORE,
+                    evidence=f"SSDP {observation.kind}",
                 )
         return None
 
@@ -226,6 +293,9 @@ class IntegrationMatcher:
                 integration=entry.get("integration"),
                 repo=entry.get("repo"),
                 source=layer,
+                evidence=f"{observation.source} {observation.kind}"
+                if observation.source in (SOURCE_MDNS, SOURCE_SSDP)
+                else f"{observation.source} {observation.detail}",
             )
         return None
 
