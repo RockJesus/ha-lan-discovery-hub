@@ -222,6 +222,18 @@ class DiscoveryHub:
             stored = None
         if stored:
             self.registry.load(stored)
+            self._async_backfill_evidence()
+
+    def _async_backfill_evidence(self) -> None:
+        """Label pre-0.7.0 matches instead of showing a suggestion with no reason.
+
+        Those records were resolved before evidence was stored; the fingerprint
+        that produced them may no longer be broadcast, so they are marked as
+        pending rather than invented.
+        """
+        for record in self.registry.records.values():
+            if record.domain and not record.match_evidence:
+                record.match_evidence = "历史判定 · 本轮未复现"
 
     async def _async_save(self) -> None:
         try:
