@@ -688,6 +688,13 @@ class DiscoveryHub:
             "ignored_count": sum(1 for r in self.registry.records.values() if r.ignored),
             "sources": self._sources,
             "channels": {
+                "mdns": {
+                    "available": self._mdns is not None,
+                    "reason": None
+                    if self._mdns is not None
+                    else "未启用",
+                    "types": getattr(self._mdns, "type_count", 0),
+                },
                 "ble": {
                     "available": bool(self._ble and self._ble.available),
                     "reason": self._ble.reason if self._ble else "未启用",

@@ -19,6 +19,13 @@ from ..registry import Observation, normalize_ip, normalize_mac
 
 _LOGGER = logging.getLogger(__name__)
 
+# The meta query every Bonjour responder answers: it lists the service types
+# the network actually uses. Home Assistant's own discovery only browses the
+# types compiled into its matcher table, so devices on types core does not know
+# (printers, NAS boxes, vendor SDKs) never surface there.
+META_TYPE = "_services._dns-sd._udp.local."
+MAX_DYNAMIC_TYPES = 80
+
 MAC_TXT_KEYS = ("mac", "macaddress", "mac_address", "hwaddr", "device_mac", "mid")
 RESOLVE_TIMEOUT_MS = 2500
 
@@ -39,6 +46,9 @@ class MdnsScanner:
         self._service_types = service_types
         self._ignored = {str(item).lower() for item in ignored_types}
         self._browser: Any = None
+        self._extra_browsers: list[Any] = []
+        self._known_types: set[str] = {str(t).lower() for t in service_types}
+        self._meta: Any = None
         self._zeroconf: Any = None
         self._inflight: set[tuple[str, str]] = set()
 
@@ -66,16 +76,83 @@ class MdnsScanner:
         self._browser = AsyncServiceBrowser(
             self._zeroconf, types, handlers=[_on_service_state_change]
         )
+
+        @callback
+        def _on_meta_state_change(
+            *, zeroconf: Any, service_type: str, name: str, state_change: Any
+        ) -> None:
+            """Handle the meta list: every entry names a service type in use."""
+            if state_change not in ("added", "updated") and not str(
+                state_change
+            ).endswith(("Added", "Updated")):
+                return
+            self.hass.async_create_task(self._async_add_type(name))
+
+        self._meta = AsyncServiceBrowser(
+            self._zeroconf, META_TYPE, handlers=[_on_meta_state_change]
+        )
         _LOGGER.debug("mDNS 浏览已启动，service types: %s", len(types or []))
+
+    @property
+    def type_count(self) -> int:
+        """How many service types are being browsed right now."""
+        return len(self._known_types)
+
+    async def _async_add_type(self, raw_name: Any) -> None:
+        """Subscribe to a service type the meta query reported."""
+        name = (
+            raw_name.decode("utf-8", "replace")
+            if isinstance(raw_name, bytes)
+            else str(raw_name)
+        )
+        kind = name.strip()
+        if not kind or kind.lower() == META_TYPE:
+            return
+        if not kind.startswith("_"):
+            kind = f"_{kind}"
+        if not kind.rstrip(".").endswith(".local"):
+            kind = f"{kind.rstrip('.')}.local."
+        key = kind.lower()
+        if key in self._known_types or key in self._ignored:
+            return
+        if len(self._known_types) >= MAX_DYNAMIC_TYPES:
+            return
+        self._known_types.add(key)
+        try:
+            from zeroconf.asyncio import AsyncServiceBrowser  # noqa: PLC0415
+
+            @callback
+            def _on_type_state_change(
+                *, zeroconf: Any, service_type: str, name: str, state_change: Any
+            ) -> None:
+                if state_change not in ("added", "updated") and not str(
+                    state_change
+                ).endswith(("Added", "Updated")):
+                    return
+                self.hass.async_create_task(
+                    self._async_handle_service(service_type, name)
+                )
+
+            browser = AsyncServiceBrowser(
+                self._zeroconf, kind, handlers=[_on_type_state_change]
+            )
+            self._extra_browsers.append(browser)
+            _LOGGER.debug("mDNS 追加服务类型: %s", kind)
+        except Exception as err:  # noqa: BLE001 - optional coverage
+            _LOGGER.debug("追加 mDNS 服务类型失败 %s: %s", kind, err)
 
     async def async_stop(self) -> None:
         """Stop browsing and release the browser."""
-        if self._browser is not None:
+        for browser in [self._browser, self._meta, *self._extra_browsers]:
+            if browser is None:
+                continue
             try:
-                await self._browser.async_cancel()
+                await browser.async_cancel()
             except Exception as err:  # noqa: BLE001 - best effort shutdown
                 _LOGGER.debug("关闭 mDNS 浏览器失败: %s", err)
-            self._browser = None
+        self._browser = None
+        self._meta = None
+        self._extra_browsers = []
 
     async def _async_handle_service(self, service_type: str, name: str) -> None:
         """Resolve one announcement and hand it to the hub."""
@@ -103,6 +180,12 @@ class MdnsScanner:
             label = _instance_label(name, service_type)
             hint = _hint_for(service_type)
             model = props.get("model") or props.get("md") or props.get("am")
+            manufacturer = (
+                props.get("manufacturer")
+                or props.get("mn")
+                or props.get("vendor")
+                or None
+            )
 
             await self._dispatch(
                 Observation(
@@ -113,6 +196,7 @@ class MdnsScanner:
                     ip=ip,
                     mac=mac,
                     host=getattr(info, "server", None),
+                    manufacturer=manufacturer,
                     model=model,
                     hint=hint,
                     props=props,
