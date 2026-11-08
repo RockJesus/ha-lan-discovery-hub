@@ -100,6 +100,11 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.8.1
+
+- **MAC 厂商标注**：内置 IEEE OUI 全表（45,192 个前缀，来自 nmap-mac-prefixes），ARP/探测/蓝牙行只要有 MAC 就能显示厂商（实测 Synology Incorporated、Huawei Technologies 等）。官方发现没有 OUI 库，这一点是纯增量。
+- 面板设备名下方优先显示厂商，其次才是广播里的 manufacturer / model / 线索行。
+
 ### 0.8.0
 
 - **mDNS 全类型枚举**：启动时先向 `_services._dns-sd._udp.local.` 发一条 meta 查询，把网络里**实际在用的每一个服务类型**都加进浏览列表（上限 80 个）。官方发现只浏览它自己编译表里认识的那几十种，所以打印机、NAS、各家 SDK 的私有服务类型在官方侧根本不会出现。

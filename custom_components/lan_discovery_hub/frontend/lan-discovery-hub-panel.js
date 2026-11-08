@@ -592,7 +592,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
     return `<tr>
       <td>
         <div class="name">${device.name}${device.ignored ? ' <span class="badge" style="background:#788">已忽略</span>' : ""}</div>
-        <div class="meta">${[device.channel_label, device.manufacturer || device.model || device.detail_line]
+        <div class="meta">${[device.channel_label, device.vendor || device.manufacturer || device.model || device.detail_line]
           .filter(Boolean)
           .join(" · ")}</div>
       </td>

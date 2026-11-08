@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import hashlib
+import pathlib
 import re
 from typing import Any, Final
 
@@ -68,6 +69,11 @@ def describe_ports(ports: Any) -> str:
     return " / ".join(labels)
 
 MAC_RE = re.compile(r"^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$")
+
+# Vendor lookup for MAC addresses. The table is the IEEE OUI registry as
+# published in nmap-mac-prefixes (45k prefixes); Home Assistant ships no such
+# table, so this is one place where the ledger can say more than core discovery.
+_OUI: dict[str, str] | None = None
 IPV4_RE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
 
 # Device states, in ascending order of "the user should look at this".
@@ -82,6 +88,29 @@ STATE_ORDER = {
     STATE_AVAILABLE: 2,
     STATE_CONFIGURED: 3,
 }
+
+
+def vendor_for_mac(mac: str | None) -> str | None:
+    """Manufacturer behind a MAC address, read from the bundled OUI table."""
+    global _OUI
+    if not mac:
+        return None
+    key = mac.replace(":", "").replace("-", "").lower()
+    if len(key) < 6:
+        return None
+    if _OUI is None:
+        table: dict[str, str] = {}
+        try:
+            path = pathlib.Path(__file__).with_name("oui.tsv")
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+                if "\t" not in line:
+                    continue
+                prefix, vendor = line.split("\t", 1)
+                table[prefix] = vendor.strip()
+        except (OSError, ValueError):
+            pass
+        _OUI = table
+    return _OUI.get(key[:6]) or _OUI.get(key[:8])
 
 
 def normalize_mac(value: Any) -> str | None:
@@ -298,6 +327,7 @@ class DeviceRecord:
     integration_name: str | None = None
     repo: str | None = None
     match_source: str | None = None
+    vendor: str | None = None
     match_evidence: str | None = None
     match_support: int = 0
     acknowledged: bool = False
@@ -362,6 +392,7 @@ class DeviceRecord:
             "integration_name": self.integration_name,
             "repo": self.repo,
             "match_source": self.match_source,
+            "vendor": self.vendor,
             "match_evidence": self.match_evidence,
             "match_support": self.match_support,
             "acknowledged": self.acknowledged,
@@ -396,6 +427,7 @@ class DeviceRecord:
             integration_name=data.get("integration_name"),
             repo=data.get("repo"),
             match_source=data.get("match_source"),
+            vendor=data.get("vendor") or vendor_for_mac(data.get("mac")),
             match_evidence=data.get("match_evidence"),
             match_support=int(data.get("match_support") or 0),
             acknowledged=bool(data.get("acknowledged")),
@@ -573,6 +605,7 @@ class DeviceRegistry:
         target.mac = target.mac or other.mac
         target.host = target.host or other.host
         target.manufacturer = target.manufacturer or other.manufacturer
+        target.vendor = target.vendor or other.vendor
         target.model = target.model or other.model
         target.hints |= other.hints
         target.services.update(other.services)
@@ -614,6 +647,7 @@ class DeviceRegistry:
         if observation.host:
             record.host = observation.host
         record.manufacturer = record.manufacturer or observation.manufacturer
+        record.vendor = record.vendor or vendor_for_mac(record.mac)
         record.model = record.model or observation.model
         if observation.hint:
             record.hints.add(observation.hint)
