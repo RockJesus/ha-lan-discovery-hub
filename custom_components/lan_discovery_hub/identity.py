@@ -168,6 +168,21 @@ TEXT_KINDS: tuple[tuple[str, str], ...] = (
     ("nas", KIND_NAS),
     ("网络存储", KIND_NAS),
     ("群晖", KIND_NAS),
+    ("synology", KIND_NAS),
+    ("qnap", KIND_NAS),
+    ("威联通", KIND_NAS),
+    ("绿联", KIND_NAS),
+    ("极空间", KIND_NAS),
+    ("光猫", KIND_ROUTER),
+    ("智能网关", KIND_ROUTER),
+    ("海康", KIND_CAMERA),
+    ("hikvision", KIND_CAMERA),
+    ("大华", KIND_CAMERA),
+    ("dahua", KIND_CAMERA),
+    ("brother", KIND_PRINTER),
+    ("epson", KIND_PRINTER),
+    ("canon", KIND_PRINTER),
+    ("xerox", KIND_PRINTER),
     ("音响", KIND_SPEAKER),
     ("音箱", KIND_SPEAKER),
     ("speaker", KIND_SPEAKER),
@@ -328,6 +343,47 @@ async def _async_reverse_dns(hass: HomeAssistant, ip: str) -> str | None:
         return None
 
 
+PAGE_HINTS: tuple[tuple[str, str, str], ...] = (
+    # (token in page, label to show, kind)
+    ("光猫", "光猫", KIND_ROUTER),
+    ("智能网关", "智能网关", KIND_ROUTER),
+    ("路由器", "路由器", KIND_ROUTER),
+    ("无线接入", "无线接入点", KIND_ROUTER),
+    ("openwrt", "OpenWrt", KIND_ROUTER),
+    ("ikuai", "爱快", KIND_ROUTER),
+    ("群晖", "群晖 DSM", KIND_NAS),
+    ("synology", "Synology DSM", KIND_NAS),
+    ("qnap", "QNAP", KIND_NAS),
+    ("威联通", "威联通 QNAP", KIND_NAS),
+    ("绿联", "绿联 NAS", KIND_NAS),
+    ("极空间", "极空间 NAS", KIND_NAS),
+    ("飞牛", "飞牛 fnOS", KIND_NAS),
+    ("海康", "海康威视", KIND_CAMERA),
+    ("hikvision", "Hikvision", KIND_CAMERA),
+    ("大华", "大华", KIND_CAMERA),
+    ("dahua", "Dahua", KIND_CAMERA),
+    ("brother", "Brother 打印机", KIND_PRINTER),
+    ("epson", "Epson 打印机", KIND_PRINTER),
+    ("打印机", "打印机", KIND_PRINTER),
+    ("机顶盒", "机顶盒", KIND_MEDIA),
+    ("投影仪", "投影仪", KIND_MEDIA),
+    ("电视", "电视", KIND_TV),
+)
+
+
+def page_hint(text: str) -> tuple[str, str] | None:
+    """Brand/product words printed on a device's own web page.
+
+    Huawei ONT login pages carry an empty <title>, so the only reliable words
+    are the product names in the body ("光猫", "智能网关", "群晖 DSM").
+    """
+    lowered = text.lower()
+    for token, label, kind in PAGE_HINTS:
+        if token in lowered:
+            return label, kind
+    return None
+
+
 def _clean_title(raw: str) -> str | None:
     text = re.sub(r"<[^>]+>", "", raw)
     text = re.sub(r"\s+", " ", text).strip()
@@ -352,11 +408,13 @@ async def probe_http(hass: HomeAssistant, ip: str, port: int) -> dict[str, Any]:
             body = await response.content.read(_MAX_BODY)
             text = body.decode("utf-8", "replace")
             match = TITLE_RE.search(text)
+            hint = page_hint(text)
             return {
                 "url": url,
                 "status": response.status,
                 "content_type": response.headers.get("Content-Type"),
                 "title": _clean_title(match.group(1)) if match else None,
+                "hint": hint[0] if hint else None,
                 "title_raw": match.group(1).strip()[:160] if match else None,
                 "bytes": len(text),
                 "head": re.sub(r"\s+", " ", text[:220]),
@@ -394,6 +452,10 @@ async def _async_web_title(
                         errors[url] = f"HTTP {response.status}"
                     continue
                 body = await response.content.read(_MAX_BODY)
+                text = body.decode("utf-8", "replace")
+                hint = page_hint(text)
+                if hint and not TITLE_RE.search(text):
+                    return hint[0]
         except Exception as err:  # noqa: BLE001 - a dead web UI must not fail a scan
             if errors is not None:
                 errors[url] = f"{type(err).__name__}: {err}"
