@@ -17,6 +17,7 @@ import re
 import socket
 import time
 from typing import Any
+from urllib.parse import urljoin
 
 import aiohttp
 
@@ -222,6 +223,14 @@ WEB_PORTS: tuple[int, ...] = (
 NON_WEB_PORTS: frozenset[int] = frozenset(
     {22, 139, 445, 548, 554, 8554, 1883, 2049, 5060, 7000, 8009, 9100, 49152, 34567, 37777}
 )
+FRAME_RE = re.compile(
+    r"""(?:src|href)\s*=\s*[\"']([^\"']+\.(?:html?|asp|aspx|cgi|jsp))[\"']""",
+    re.IGNORECASE,
+)
+JS_REDIRECT_RE = re.compile(
+    r"""(?:location(?:\.href)?|window\.location)\s*=\s*[\"']([^\"']+)[\"']""",
+    re.IGNORECASE,
+)
 TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.S)
 MAX_TITLE_CHARS = 70
 _CACHE: dict[str, dict[str, Any]] = {}
@@ -392,6 +401,22 @@ def _clean_title(raw: str) -> str | None:
     return text
 
 
+def _landing_target(text: str, base: str) -> str | None:
+    """Where a device's stub landing page sends the browser.
+
+    Huawei ONT/gateway pages ship a ~3 KB stub whose real UI lives behind a
+    frame or a JS redirect; reading only the stub finds no product words.
+    """
+    for regex in (FRAME_RE, JS_REDIRECT_RE):
+        match = regex.search(text)
+        if match:
+            target = match.group(1).strip()
+            if target.startswith(("http://", "https://")):
+                return target
+            return urljoin(base, target.lstrip("./"))
+    return None
+
+
 async def probe_http(hass: HomeAssistant, ip: str, port: int) -> dict[str, Any]:
     """Fetch one URL and report status/title/error — used for diagnostics."""
     session = async_get_clientsession(hass)
@@ -415,6 +440,7 @@ async def probe_http(hass: HomeAssistant, ip: str, port: int) -> dict[str, Any]:
                 "content_type": response.headers.get("Content-Type"),
                 "title": _clean_title(match.group(1)) if match else None,
                 "hint": hint[0] if hint else None,
+                "landing": _landing_target(text, url),
                 "title_raw": match.group(1).strip()[:160] if match else None,
                 "bytes": len(text),
                 "head": re.sub(r"\s+", " ", text[:220]),
@@ -458,6 +484,26 @@ async def _async_web_title(
                 # An empty or boilerplate <title> is worse than nothing: fall
                 # back to the product words the page itself prints.
                 if hint and (match is None or not _clean_title(match.group(1))):
+                    return hint[0]
+                landing = None
+                if not hint and (match is None or not _clean_title(match.group(1))):
+                    landing = _landing_target(text, url)
+            if landing:
+                async with session.get(
+                    landing,
+                    timeout=aiohttp.ClientTimeout(total=4),
+                    ssl=False,
+                    allow_redirects=True,
+                    headers={"User-Agent": "HomeAssistant-LanDiscovery/1.0"},
+                ) as response:
+                    page = (await response.content.read(_MAX_BODY)).decode(
+                        "utf-8", "replace"
+                    )
+                title = TITLE_RE.search(page)
+                if title and _clean_title(title.group(1)):
+                    return _clean_title(title.group(1))
+                hint = page_hint(page)
+                if hint:
                     return hint[0]
         except Exception as err:  # noqa: BLE001 - a dead web UI must not fail a scan
             if errors is not None:
