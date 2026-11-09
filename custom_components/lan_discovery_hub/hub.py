@@ -16,6 +16,7 @@ from homeassistant.helpers.event import async_call_later, async_track_time_inter
 from homeassistant.helpers.storage import Store
 
 from .catalog import IntegrationCatalog
+from .i18n import language_of, t
 from .const import (
     CONF_FULL_SWEEP,
     CONF_IGNORED_DEVICES,
@@ -142,6 +143,7 @@ class DiscoveryHub:
         # The catalog is what turns evidence into a suggestion; load it before
         # the first scan so the very first render already has candidates.
         await self.catalog.async_load()
+        self.matcher.set_language(language_of(self.hass))
         self._installed_domains = _installed_domains(self.hass)
         await self._async_load()
 
@@ -241,7 +243,7 @@ class DiscoveryHub:
         """
         for record in self.registry.records.values():
             if record.domain and not record.match_evidence:
-                record.match_evidence = "历史判定 · 本轮未复现"
+                record.match_evidence = t(self.hass, "evidence.history")
 
     async def _async_save(self) -> None:
         try:
@@ -522,7 +524,7 @@ class DiscoveryHub:
             self.hass, domain
         )
         if matched.confidence != "exact":
-            display = f"推测 · {display or domain}"
+            display = t(self.hass, "guess.prefix", name=display or domain)
         self.registry.set_match(
             record.device_id,
             state=state,
@@ -578,22 +580,33 @@ class DiscoveryHub:
         actionable.sort(key=lambda item: (STATE_ORDER[item.state], item.name.lower()))
         lines = []
         for record in actionable[:8]:
-            integration = record.integration_name or record.domain or "未知集成"
-            where = record.ip or record.mac or "未知地址"
-            lines.append(f"- **{record.name}**（{where}）→ {integration}")
+            integration = record.integration_name or record.domain or t(
+                self.hass, "unknown.integration"
+            )
+            where = record.ip or record.mac or t(self.hass, "unknown.address")
+            lines.append(
+                t(
+                    self.hass,
+                    "notify.line",
+                    name=record.name,
+                    where=where,
+                    integration=integration,
+                )
+            )
         if len(actionable) > 8:
-            lines.append(f"- 其余 {len(actionable) - 8} 台见面板")
+            lines.append(t(self.hass, "notify.more", count=len(actionable) - 8))
 
-        message = (
-            f"发现 **{len(actionable)}** 台可接入的设备：\n\n"
-            + "\n".join(lines)
-            + "\n\n打开侧栏「局域网发现」面板可查看全部设备、一键配置或安装对应集成。"
+        message = t(
+            self.hass,
+            "notify.body",
+            count=len(actionable),
+            lines="\n".join(lines),
         )
         try:
             persistent_notification.async_create(
                 self.hass,
                 message,
-                title="局域网发现",
+                title=t(self.hass, "notify.title"),
                 notification_id=NOTIFICATION_ID,
             )
         except Exception as err:  # noqa: BLE001 - notification is best effort
@@ -691,9 +704,11 @@ class DiscoveryHub:
         )
         payload = []
         for record in records:
-            item = record.as_dict()
+            item = record.as_dict(language_of(self.hass))
             try:
-                item["suggestions"] = self.catalog.suggest(record, self._installed_domains)
+                item["suggestions"] = self.catalog.suggest(
+                    record, self._installed_domains, language_of(self.hass)
+                )
             except Exception as err:  # noqa: BLE001 - a suggestion never breaks a render
                 _LOGGER.debug("生成集成建议失败 %s: %s", record.name, err)
                 item["suggestions"] = []

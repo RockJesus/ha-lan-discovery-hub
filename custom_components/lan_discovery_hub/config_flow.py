@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResu
 from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 
+from .i18n import t
 from .const import (
     CONF_FULL_SWEEP,
     CONF_IGNORED_TYPES,
@@ -29,12 +30,14 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-SOURCE_LABELS = {
-    SOURCE_MDNS: "mDNS（AirPlay、Cast、打印机、HomeKit…）",
-    SOURCE_SSDP: "SSDP / UPnP（电视、音箱、路由、NAS…）",
-    SOURCE_PROBE: "TCP 端口探测 + ARP 缓存（补齐 IP 与 MAC）",
-    SOURCE_ARP: "仅 ARP 邻居缓存",
-}
+def source_labels(hass: Any) -> dict[str, str]:
+    """Channel names for the options selector in the current language."""
+    return {
+        SOURCE_MDNS: t(hass, "source.mdns"),
+        SOURCE_SSDP: t(hass, "source.ssdp"),
+        SOURCE_PROBE: t(hass, "source.probe"),
+        SOURCE_ARP: t(hass, "source.arp"),
+    }
 
 
 class LanDiscoveryConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -90,7 +93,7 @@ class LanDiscoveryOptionsFlow(OptionsFlow):
                 {
                     vol.Required(
                         CONF_SOURCES, default=current_sources
-                    ): cv.multi_select(SOURCE_LABELS),
+                    ): cv.multi_select(source_labels(self.hass)),
                     vol.Required(
                         CONF_SCAN_INTERVAL,
                         default=options.get(

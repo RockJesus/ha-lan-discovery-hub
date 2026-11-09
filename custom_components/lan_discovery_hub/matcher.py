@@ -20,6 +20,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from .i18n import EN, STRINGS
 from .const import (
     SOURCE_BLE,
     SOURCE_MDNS,
@@ -90,6 +91,7 @@ class IntegrationMatcher:
         self._curated = _load_json(package_dir / "integration_map.json")
         self._user = _load_json(Path(config_dir) / USER_MAP_FILENAME)
         self._display_names: dict[str, str | None] = {}
+        self._lang = EN
 
     # ------------------------------------------------------------------ core
 
@@ -140,7 +142,7 @@ class IntegrationMatcher:
                     integration=None,
                     repo=observation.props.get("vendor_repo"),
                     source=MATCH_CURATED,
-                    evidence="设备自报厂商域",
+                    evidence=self._t("evidence.vendor_domain"),
                 )
             return None
         if observation.source == SOURCE_MQTT:
@@ -148,10 +150,10 @@ class IntegrationMatcher:
             # itself; the row is here so the owner can see it before it lands.
             return Match(
                 domain="mqtt",
-                integration="MQTT 自动认领",
+                integration=self._t("evidence.mqtt_claim"),
                 repo=None,
                 source=MATCH_CORE,
-                evidence="MQTT 发现主题",
+                evidence=self._t("evidence.mqtt_topic"),
             )
 
         for layer, entries in (
@@ -190,13 +192,16 @@ class IntegrationMatcher:
             if hint is None:
                 continue
             domain, label = hint
+            from .registry import port_label  # noqa: PLC0415 - avoid an import cycle
+
+            shown = port_label(number, self._lang) or label
             return Match(
                 domain=domain,
                 integration=None,
                 repo=None,
                 source=MATCH_CURATED,
                 confidence="weak",
-                evidence=f"端口 {number}（{label}）",
+                evidence=self._t("evidence.port", port=number, label=shown),
             )
         return None
 
@@ -343,6 +348,14 @@ class IntegrationMatcher:
             return custom.is_dir()
         except (AttributeError, OSError):  # pragma: no cover
             return False
+
+    def set_language(self, lang: str) -> None:
+        """Pick the language used for generated evidence text."""
+        self._lang = lang
+
+    def _t(self, key: str, **fmt: Any) -> str:
+        text = (STRINGS.get(key) or {}).get(self._lang) or (STRINGS.get(key) or {}).get(EN, key)
+        return text.format(**fmt) if fmt else text
 
     def display_name(self, hass: Any, domain: str) -> str | None:
         """Human readable integration name from its manifest."""

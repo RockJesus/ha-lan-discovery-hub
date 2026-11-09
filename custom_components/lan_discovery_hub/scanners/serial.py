@@ -22,9 +22,17 @@ from pathlib import Path
 from typing import Any
 
 from ..const import SERIAL_HINTS, SERIAL_VID_PID, SOURCE_SERIAL
+from ..i18n import t
 from ..registry import Observation
 
 _LOGGER = logging.getLogger(__name__)
+
+# Hardware names stay verbatim; only the generic role descriptions are translated.
+_GENERIC_LABELS = {
+    "Zigbee 适配器": "serial.zigbee_adapter",
+    "Z-Wave 适配器": "serial.zwave_adapter",
+    "Espressif 串口": "serial.esp",
+}
 
 BY_ID_DIR = Path("/dev/serial/by-id")
 USB_DIR = Path("/sys/bus/usb/devices")
@@ -116,6 +124,13 @@ class SerialScanner:
             _LOGGER.debug("读取串口目录失败: %s", err)
             return []
 
+        def shown(value: str | None) -> str | None:
+            """Translate the generic role names, leave hardware names alone."""
+            if not value:
+                return value
+            key = _GENERIC_LABELS.get(value)
+            return t(self.hass, key) if key else value
+
         usb = usb_inventory()
         out: list[Observation] = []
         for entry in entries:
@@ -139,9 +154,9 @@ class SerialScanner:
                     kind="adapter",
                     detail=by_id,
                     name=pretty_name(by_id),
-                    manufacturer=usb_info.get("manufacturer") or label,
-                    model=usb_info.get("product") or None,
-                    hint="USB 适配器",
+                    manufacturer=shown(usb_info.get("manufacturer")) or shown(label),
+                    model=shown(usb_info.get("product")),
+                    hint=t(self.hass, "channel.serial"),
                     unique_instance=True,
                     props={
                         "port": port,

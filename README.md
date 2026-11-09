@@ -3,6 +3,14 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 ![HA Version](https://img.shields.io/badge/Home%20Assistant-2026.10%2B-03A9F4)
 
+> English summary: LAN Discovery Hub fills the gap left by Home Assistant's built-in discovery —
+> it lists every device on the LAN (mDNS, SSDP, TCP/ARP, MQTT, Bluetooth, serial), merges each
+> device into one row, and tells you which integration can add it, including third-party
+> integrations you have not installed yet. The sidebar panel and notifications are bilingual
+> (English / 简体中文) and follow your Home Assistant language. It never adds anything without
+> your confirmation.
+
+
 给 Home Assistant 补上官方「发现」看不见的那一块：**把局域网里所有设备收进一张台账，
 并告诉你每台设备该用哪个集成接入——包括你还没装过的第三方集成。**
 
@@ -99,6 +107,11 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 - 内置 `integration_map.json` 只收录已验证的第三方映射，需要持续人工补充。
 
 ## 版本记录
+
+### 0.9.2
+
+- **中英双语**：侧栏面板、汇总通知、设备渠道/端口/协议依据、候选集成打分理由全部随 Home Assistant 的语言切换（英文 / 简体中文）。Runtime 文案集中在 `i18n.py`，面板文案在 `STRINGS` 表里，config flow / 实体 / 服务仍走 `translations/`。
+- README 顶部补英文摘要。
 
 ### 0.9.1
 

@@ -25,6 +25,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
+from .i18n import EN, STRINGS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -133,10 +134,16 @@ class IntegrationCatalog:
 
     # -------------------------------------------------------------- matching
 
+    def _t(self, key: str, lang: str, **fmt: Any) -> str:
+        """Translate one reason fragment."""
+        text = (STRINGS.get(key) or {}).get(lang) or (STRINGS.get(key) or {}).get(EN, key)
+        return text.format(**fmt) if fmt else text
+
     def suggest(
         self,
         record: Any,
         installed_domains: set[str] | None = None,
+        lang: str = EN,
     ) -> list[dict[str, Any]]:
         """Rank catalog entries against one device record."""
         if not self.entries:
@@ -186,31 +193,55 @@ class IntegrationCatalog:
 
             if device_domain and domain == device_domain:
                 score += 60
-                reasons.append("指纹命中")
+                reasons.append(self._t("catalog.reason.fingerprint", lang))
             if domain in kinds:
                 score += 45
-                reasons.append("服务类型同名")
+                reasons.append(self._t("catalog.reason.kind_same", lang))
 
             domain_words = set(re.split(r"[_\-.]", domain)) - _STOPWORDS
             kind_hits = domain_words & kinds
             vendor_hits = domain_words & identity_terms
             if kind_hits:
                 score += 24 * min(len(kind_hits), 2)
-                reasons.append(f"域名与「{'、'.join(sorted(kind_hits))}」同源")
+                reasons.append(
+                    self._t(
+                        "catalog.reason.domain_kind",
+                        lang,
+                        terms="、".join(sorted(kind_hits)) if lang != EN else ", ".join(sorted(kind_hits)),
+                    )
+                )
             elif vendor_hits:
                 score += 16 * min(len(vendor_hits), 2)
-                reasons.append(f"域名含厂商「{'、'.join(sorted(vendor_hits))}」")
+                reasons.append(
+                    self._t(
+                        "catalog.reason.domain_vendor",
+                        lang,
+                        terms="、".join(sorted(vendor_hits)) if lang != EN else ", ".join(sorted(vendor_hits)),
+                    )
+                )
 
             topic_hits = _tokens(" ".join(entry.get("topics") or [])) & match_terms
             if topic_hits:
                 score += (8 if topic_hits & kinds else 4) * min(len(topic_hits), 2)
-                reasons.append(f"标签「{'、'.join(sorted(topic_hits))}」")
+                reasons.append(
+                    self._t(
+                        "catalog.reason.topic",
+                        lang,
+                        terms="、".join(sorted(topic_hits)) if lang != EN else ", ".join(sorted(topic_hits)),
+                    )
+                )
 
             if not score:
                 desc_hits = _tokens(entry.get("description")) & match_terms
                 if desc_hits:
                     score += 2 * min(len(desc_hits), 2)
-                    reasons.append(f"描述含「{'、'.join(sorted(desc_hits))}」")
+                    reasons.append(
+                    self._t(
+                        "catalog.reason.description",
+                        lang,
+                        terms="、".join(sorted(desc_hits)) if lang != EN else ", ".join(sorted(desc_hits)),
+                    )
+                )
 
             if not score:
                 continue
@@ -225,7 +256,9 @@ class IntegrationCatalog:
 
             enriched = dict(entry)
             enriched["score"] = round(score, 1)
-            enriched["reason"] = "；".join(reasons) or "热度"
+            enriched["reason"] = self._t("catalog.joiner", lang).join(reasons) or self._t(
+                "catalog.reason.popular", lang
+            )
             enriched["installed"] = domain in installed_domains
             candidates.append((score, enriched))
 

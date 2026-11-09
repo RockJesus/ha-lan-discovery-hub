@@ -21,6 +21,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 
+from .i18n import t as _t
 from .const import (
     DOMAIN,
     FRONTEND_PATH,
@@ -140,7 +141,7 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
         async_register_built_in_panel(
             hass,
             component_name="custom",
-            sidebar_title="局域网发现",
+            sidebar_title=_t(hass, "panel.title"),
             sidebar_icon="mdi:lan",
             frontend_url_path=PANEL_URL,
             config={

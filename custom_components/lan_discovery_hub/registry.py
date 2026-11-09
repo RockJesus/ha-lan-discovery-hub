@@ -22,6 +22,8 @@ import pathlib
 import re
 from typing import Any, Final
 
+from .i18n import EN, ZH, STRINGS
+
 
 # What usually listens on a port. Used purely as a label under a device that
 # has no service type to announce itself with.
@@ -31,9 +33,9 @@ PORT_LABELS: dict[int, str] = {
     80: "HTTP",
     139: "SMB",
     443: "HTTPS",
-    445: "SMB 文件共享",
-    554: "RTSP 视频流",
-    631: "IPP 打印",
+    445: "SMB file share",
+    554: "RTSP stream",
+    631: "IPP printing",
     1883: "MQTT",
     32400: "Plex",
     3493: "NUT",
@@ -44,15 +46,23 @@ PORT_LABELS: dict[int, str] = {
     8008: "Chromecast",
     8009: "Chromecast",
     8123: "Home Assistant",
-    9100: "打印服务",
-    49152: "私有端口",
+    9100: "Print service",
+    49152: "Private port",
 }
 
 
 
 
-def describe_ports(ports: Any) -> str:
-    """Render a port list with the service that usually owns each port."""
+def port_label(number: int, lang: str = EN) -> str | None:
+    """Localised service name for a port, falling back to the technical name."""
+    key = f"port.{number}"
+    entry = STRINGS.get(key)
+    if entry:
+        return entry.get(lang) or entry.get(EN)
+    return PORT_LABELS.get(number)
+
+
+def describe_ports(ports: Any, lang: str = EN) -> str:
     """Render a port list with the service that usually owns each port."""
     if isinstance(ports, (int, float)):
         ports = [ports]
@@ -64,7 +74,7 @@ def describe_ports(ports: Any) -> str:
             number = int(port)
         except (TypeError, ValueError):
             continue
-        label = PORT_LABELS.get(number)
+        label = port_label(number, lang)
         labels.append(f"{number} {label}" if label else str(number))
     return " / ".join(labels)
 
@@ -204,14 +214,23 @@ def _is_service_word(name: str | None, kinds: set[str]) -> bool:
 # Devices that never publish an address are only reachable through one of the
 # hub's own channels; grouping by that channel is what makes them readable.
 CHANNEL_LABELS = {
-    "mdns": "局域网 · mDNS",
-    "ssdp": "局域网 · SSDP",
-    "probe": "局域网 · 探测",
-    "mqtt": "MQTT 设备",
-    "ble": "蓝牙设备",
-    "serial": "串口设备",
-    "arp": "局域网 · ARP 邻居",
+    "mdns": "LAN · mDNS",
+    "ssdp": "LAN · SSDP",
+    "probe": "LAN · port probe",
+    "mqtt": "MQTT device",
+    "ble": "Bluetooth device",
+    "serial": "Serial device",
+    "arp": "LAN · ARP neighbour",
 }
+
+
+def channel_label(channel: str | None, lang: str = EN) -> str:
+    """Localised label for a discovery channel."""
+    key = f"channel.{channel or 'none'}"
+    entry = STRINGS.get(key)
+    if entry is None:
+        return channel or ""
+    return entry.get(lang) or entry.get(EN)
 _LAN_CHANNELS = ("mdns", "ssdp", "probe", "arp")
 _OFFLAN_CHANNELS = ("mqtt", "ble", "serial")
 
@@ -346,37 +365,39 @@ class DeviceRecord:
                 return name
         return next(iter(sources), None)
 
-    def _detail_line(self) -> str:
+    def _detail_line(self, lang: str = ZH) -> str:
         """A short, honest description when the name is just a hardware handle."""
         channel = self.channel
         if channel == "ble":
             for service in self.services.values():
                 rssi = service.props.get("rssi")
                 if isinstance(rssi, (int, float)):
-                    return f"信号 {rssi} dBm"
-            return "蓝牙广播"
+                    text = STRINGS["detail.ble_rssi"].get(lang) or STRINGS["detail.ble_rssi"][EN]
+                    return text.format(rssi=rssi)
+            return STRINGS["detail.ble_plain"].get(lang) or STRINGS["detail.ble_plain"][EN]
         if channel == "mqtt":
             for service in self.services.values():
                 for key in ("manufacturer", "model"):
                     value = service.props.get(key)
                     if isinstance(value, str) and value.strip():
                         return value.strip()
-            return "MQTT 自动发现"
+            return STRINGS["detail.mqtt_auto"].get(lang) or STRINGS["detail.mqtt_auto"][EN]
         if channel == "serial":
             for service in self.services.values():
                 port = service.detail or service.props.get("port")
                 if isinstance(port, str) and port:
                     return port
-            return "串口设备"
+            return STRINGS["detail.serial"].get(lang) or STRINGS["detail.serial"][EN]
         if channel == "probe":
             for service in self.services.values():
                 ports = service.props.get("ports")
-                described = describe_ports(ports)
+                described = describe_ports(ports, lang)
                 if described:
-                    return f"端口 {described}"
+                    text = STRINGS["detail.ports"].get(lang) or STRINGS["detail.ports"][EN]
+                    return text.format(ports=described)
         return self.host or ""
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self, lang: str = ZH) -> dict[str, Any]:
         """Serialize for storage and for the websocket API."""
         channel = self.channel
         return {
@@ -400,8 +421,8 @@ class DeviceRecord:
             "ignored": self.ignored,
             "hints": sorted(self.hints),
             "channel": channel,
-            "channel_label": CHANNEL_LABELS.get(channel or "", "未分类"),
-            "detail_line": self._detail_line(),
+            "channel_label": channel_label(channel, lang),
+            "detail_line": self._detail_line(lang),
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
             "services": {
