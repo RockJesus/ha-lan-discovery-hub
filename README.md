@@ -108,6 +108,11 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.9.6
+
+- 面板注册时读取 `manifest.json` 的动作移到 executor（v0.9.5 之后日志里唯一剩下的本集成告警）。
+- 同时把 `/proc/net/arp` 读取与串口 `/dev`、`/sys` 快照也移到 executor，扫描通道不再在事件循环里做文件 IO。
+
 ### 0.9.5
 
 - 修复 HA 2026.11 起标记的弃用用法：设备注册表不再当映射用（`registry.devices.values()` → 直接迭代 `registry.devices`），hub 与 MQTT 扫描器各一处。

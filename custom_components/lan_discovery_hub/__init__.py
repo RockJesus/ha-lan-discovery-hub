@@ -105,6 +105,16 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     await hass.config_entries.async_reload(entry.entry_id)
 
 
+def _manifest_version() -> str:
+    """Read our own version; runs in the executor, never in the event loop."""
+    try:
+        return json.loads(
+            (Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
+        ).get("version", "0")
+    except Exception:  # noqa: BLE001 - a missing manifest is not fatal here
+        return "0"
+
+
 async def _async_register_panel(hass: HomeAssistant) -> None:
     """Register the sidebar panel and serve its frontend module."""
     store = hass.data.setdefault(
@@ -128,13 +138,7 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
     # Bust the browser's module cache on every release: a custom panel's
     # module_url is a stable path, so without a version the browser keeps
     # rendering the previous build (observed on a real instance after 0.3.6).
-    version = "0"
-    try:
-        version = json.loads(
-            (Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
-        ).get("version", "0")
-    except Exception:  # noqa: BLE001 - a missing manifest is not fatal here
-        pass
+    version = await hass.async_add_executor_job(_manifest_version)
     module_url = f"{PANEL_MODULE_URL}?v={version}"
 
     try:

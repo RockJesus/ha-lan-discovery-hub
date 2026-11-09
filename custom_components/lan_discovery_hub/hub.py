@@ -332,7 +332,9 @@ class DiscoveryHub:
         """Feed serial/USB adapters mapped into the container."""
         if self._serial is None:
             return
-        for observation in self._serial.snapshot():
+        # SerialScanner.snapshot() reads /dev and /sys: run it off the loop.
+        observations = await self.hass.async_add_executor_job(self._serial.snapshot)
+        for observation in observations:
             await self._async_on_observation(observation)
 
     def _async_prune_channels(self) -> None:
@@ -366,7 +368,7 @@ class DiscoveryHub:
             await self._async_on_observation(observation)
 
     async def _async_collect_arp(self) -> None:
-        cache = read_arp_cache()
+        cache = await self.hass.async_add_executor_job(read_arp_cache)
         if not cache:
             _LOGGER.debug("没有可用的 ARP 邻居缓存")
             return
