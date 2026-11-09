@@ -188,7 +188,25 @@ TEXT_KINDS: tuple[tuple[str, str], ...] = (
     ("home assistant", KIND_HUB),
 )
 
-WEB_PORTS: tuple[int, ...] = (80, 443, 8080, 8000, 8081, 8888, 5000, 5001)
+WEB_PORTS: tuple[int, ...] = (
+    80,
+    443,
+    8080,
+    8000,
+    8081,
+    8888,
+    5000,
+    5001,
+    81,
+    3000,
+    8008,
+    9000,
+    9090,
+)
+# Ports that are never a web UI: trying them just wastes the device's time.
+NON_WEB_PORTS: frozenset[int] = frozenset(
+    {22, 139, 445, 548, 554, 8554, 1883, 2049, 5060, 7000, 8009, 9100, 49152, 34567, 37777}
+)
 TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.S)
 MAX_TITLE_CHARS = 70
 _CACHE: dict[str, dict[str, Any]] = {}
@@ -322,10 +340,14 @@ async def _async_web_title(hass: HomeAssistant, ip: str, ports: list[int]) -> st
     """Page title of the device's own web UI, when it has one."""
     candidates = [port for port in ports if port in WEB_PORTS]
     if not candidates:
+        # An unknown high port is still worth one look: many NAS/router web UIs
+        # live on something like :8089.
+        candidates = [port for port in ports if port not in NON_WEB_PORTS]
+    if not candidates:
         return None
     session = async_get_clientsession(hass)
-    for port in candidates[:2]:
-        scheme = "https" if port == 443 else "http"
+    for port in candidates[:3]:
+        scheme = "https" if port in (443, 5001) else "http"
         url = f"{scheme}://{ip}:{port}/"
         try:
             async with session.get(
