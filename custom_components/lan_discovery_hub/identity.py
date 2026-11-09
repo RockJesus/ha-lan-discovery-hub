@@ -350,13 +350,16 @@ async def probe_http(hass: HomeAssistant, ip: str, port: int) -> dict[str, Any]:
             headers={"User-Agent": "HomeAssistant-LanDiscovery/1.0"},
         ) as response:
             body = await response.content.read(_MAX_BODY)
-            match = TITLE_RE.search(body.decode("utf-8", "replace"))
-            title = _clean_title(match.group(1)) if match else None
+            text = body.decode("utf-8", "replace")
+            match = TITLE_RE.search(text)
             return {
                 "url": url,
                 "status": response.status,
                 "content_type": response.headers.get("Content-Type"),
-                "title": title,
+                "title": _clean_title(match.group(1)) if match else None,
+                "title_raw": match.group(1).strip()[:160] if match else None,
+                "bytes": len(text),
+                "head": re.sub(r"\s+", " ", text[:220]),
                 "error": None,
             }
     except Exception as err:  # noqa: BLE001 - diagnostics must report, not raise
