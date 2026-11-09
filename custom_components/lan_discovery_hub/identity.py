@@ -180,6 +180,8 @@ TEXT_KINDS: tuple[tuple[str, str], ...] = (
     ("ipad", KIND_TABLET),
     ("macbook", KIND_COMPUTER),
     ("imac", KIND_COMPUTER),
+    ("appletv", KIND_TV),
+    ("homepod", KIND_SPEAKER),
     ("windows", KIND_COMPUTER),
     ("ubuntu", KIND_COMPUTER),
     ("linux", KIND_COMPUTER),
@@ -235,8 +237,41 @@ def classify(
     model: str | None = None,
     vendor: str | None = None,
     web_title: str | None = None,
+    name: str | None = None,
 ) -> str | None:
-    """Best device class from everything already known, without any network IO."""
+    """Best device class from everything already known, without any network IO.
+
+    Order matters. A name or model the device prints about itself ("AppleTV",
+    "MacBookPro", "群晖") beats an incidental service it happens to host, and
+    only genuinely distinctive vendors (NAS/printer/camera/appliance makers)
+    are allowed to outrank a protocol announcement.
+    """
+    # 1. The device's own words.
+    for text in (model, name, web_title):
+        lowered = (text or "").lower()
+        if not lowered:
+            continue
+        for token, kind in TEXT_KINDS:
+            if token in lowered:
+                return kind
+
+    # 2. Distinctive hardware makers: a NAS that also answers AirPlay is still
+    #    a NAS, a Brother printer that also speaks IPP is still a printer.
+    for text in (vendor, manufacturer):
+        lowered = (text or "").lower()
+        if not lowered:
+            continue
+        for token, kind in VENDOR_KINDS:
+            if token in lowered and kind in (
+                KIND_NAS,
+                KIND_PRINTER,
+                KIND_CAMERA,
+                KIND_APPLIANCE,
+                KIND_IOT,
+            ):
+                return kind
+
+    # 3. Protocols that announce what they are.
     kinds = _service_kinds(services)
     for token, kind in MDNS_KINDS:
         if any(token in kind_name for kind_name in kinds):
@@ -247,29 +282,14 @@ def classify(
             if token in device_type:
                 return kind
 
+    # 4. Open ports, then the last resort: the web page title.
     for port in _port_list(services):
         if port in PORT_KINDS:
             return PORT_KINDS[port]
-
-    for text in (model, manufacturer, vendor, web_title):
-        lowered = (text or "").lower()
-        if not lowered:
-            continue
-        for token, kind in TEXT_KINDS:
-            if token in lowered:
-                return kind
-
-    for text in (vendor, manufacturer):
-        lowered = (text or "").lower()
-        if not lowered:
-            continue
-        for token, kind in VENDOR_KINDS:
-            if token in lowered:
-                return kind
-        if "apple" in lowered:
-            return KIND_COMPUTER
-        if any(brand in lowered for brand in ("huawei", "zte", "asus", "tplink")):
-            return KIND_ROUTER
+    lowered_title = (web_title or "").lower()
+    for token, kind in TEXT_KINDS:
+        if token in lowered_title:
+            return kind
     return None
 
 
@@ -315,7 +335,7 @@ async def _async_web_title(hass: HomeAssistant, ip: str, ports: list[int]) -> st
                 allow_redirects=True,
                 headers={"User-Agent": "HomeAssistant-LanDiscovery/1.0"},
             ) as response:
-                if response.status >= 400:
+                if response.status >= 500:
                     continue
                 body = await response.content.read(_MAX_BODY)
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, OSError):

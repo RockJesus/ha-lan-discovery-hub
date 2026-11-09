@@ -264,14 +264,16 @@ class DiscoveryHub:
         """
         records = list(self.registry.records.values())
         for record in records:
-            if record.kind:
-                continue
+            # Re-derive every round: the classifier improves between releases
+            # and a stale label must not survive an upgrade.
             try:
                 record.kind = identity.classify(
                     record.services,
                     manufacturer=record.manufacturer,
                     model=record.model,
                     vendor=record.vendor,
+                    web_title=record.web_title,
+                    name=record.name,
                 )
             except Exception as err:  # noqa: BLE001 - identity must never break a scan
                 _LOGGER.debug("识别设备类型失败 %s: %s", record.name, err)
