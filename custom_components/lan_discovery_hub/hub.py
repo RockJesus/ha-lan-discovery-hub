@@ -54,6 +54,7 @@ from .registry import (
     DeviceRecord,
     DeviceRegistry,
     Observation,
+    vendor_for_mac,
 )
 from .scanners.ble import BleScanner
 from .scanners.mdns import MdnsScanner
@@ -145,7 +146,14 @@ class DiscoveryHub:
         await self.catalog.async_load()
         self.matcher.set_language(language_of(self.hass))
         await self.matcher.async_load_maps(self.hass)
-        self._installed_domains = _installed_domains(self.hass)
+        # Directory walking and the 45k-line OUI table are blocking I/O: keep
+        # both off the event loop.
+        self._installed_domains = await self.hass.async_add_executor_job(
+            _installed_domains, self.hass
+        )
+        self._oui_ready = await self.hass.async_add_executor_job(
+            vendor_for_mac, "00:00:00"
+        )
         await self._async_load()
 
         if SOURCE_MDNS in self._sources:

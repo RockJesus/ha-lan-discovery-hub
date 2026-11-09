@@ -108,6 +108,10 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.9.4
+
+- 消除本集成自带的阻塞 IO 告警：`/usr/src/homeassistant/homeassistant/components` 目录扫描与 4.5 万行 `oui.tsv` 首次加载都改到 executor，不再在事件循环里跑。
+
 ### 0.9.3
 
 - 修复 v0.9.2 引入的扫描崩溃：`_match_ports` 改成实例方法（原先 `@staticmethod` 里用了 `self._lang`，每轮扫描都会抛 `name 'self' is not defined`，端口推断因此失效）。
