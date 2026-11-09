@@ -22,7 +22,7 @@ import pathlib
 import re
 from typing import Any, Final
 
-from .i18n import EN, ZH, STRINGS
+from .i18n import EN, STRINGS, ZH, t
 
 
 # What usually listens on a port. Used purely as a label under a device that
@@ -161,7 +161,7 @@ def _name_quality(name: str | None) -> int:
     if not name:
         return 0
     text = name.strip()
-    if not text or text == "未知设备":
+    if not text or text in ("未知设备", "Unknown device"):
         return 0
     if _IP_LIKE.match(text):
         return 1
@@ -730,7 +730,7 @@ class DeviceRegistry:
             return record.name
         if observation.ip:
             return observation.ip
-        return "未知设备"
+        return t(self.hass, "registry.unknown")
 
     # ------------------------------------------------------------------ updates
 

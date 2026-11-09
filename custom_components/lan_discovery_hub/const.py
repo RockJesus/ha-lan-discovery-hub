@@ -57,14 +57,14 @@ SERIAL_HINTS: Final = (
     ("conbee", "zha", None, "ConBee"),
     ("cc2652", "zha", None, "CC2652"),
     ("cc2531", "zha", None, "CC2531"),
-    ("zigbee", "zha", None, "Zigbee 适配器"),
+    ("zigbee", "zha", None, "Zigbee adapter"),
     ("z-stick", "zwave_js", None, "Aeotec Z-Stick"),
-    ("zwave", "zwave_js", None, "Z-Wave 适配器"),
+    ("zwave", "zwave_js", None, "Z-Wave adapter"),
     ("aeotec", "zwave_js", None, "Aeotec"),
     ("cp210", "", None, "Silicon Labs CP210x"),
     ("ch340", "", None, "WCH CH340"),
     ("ch343", "", None, "WCH CH343"),
-    ("espressif", "", None, "Espressif 串口"),
+    ("espressif", "", None, "Espressif serial port"),
 )
 
 # Fallback when the by-id name carries no model string (unnamed sticks show

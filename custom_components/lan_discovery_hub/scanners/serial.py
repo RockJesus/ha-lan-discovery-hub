@@ -29,9 +29,9 @@ _LOGGER = logging.getLogger(__name__)
 
 # Hardware names stay verbatim; only the generic role descriptions are translated.
 _GENERIC_LABELS = {
-    "Zigbee 适配器": "serial.zigbee_adapter",
-    "Z-Wave 适配器": "serial.zwave_adapter",
-    "Espressif 串口": "serial.esp",
+    "Zigbee adapter": "serial.zigbee_adapter",
+    "Z-Wave adapter": "serial.zwave_adapter",
+    "Espressif serial port": "serial.esp",
 }
 
 BY_ID_DIR = Path("/dev/serial/by-id")
@@ -108,7 +108,7 @@ class SerialScanner:
         self.reason = (
             None
             if self.available
-            else "容器内看不到 /dev/serial/by-id（未插适配器或串口未映射进容器）"
+            else t(self.hass, "channel.serial_missing")
         )
 
     async def async_stop(self) -> None:

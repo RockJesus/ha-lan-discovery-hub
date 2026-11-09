@@ -108,6 +108,12 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.9.3
+
+- 修复 v0.9.2 引入的扫描崩溃：`_match_ports` 改成实例方法（原先 `@staticmethod` 里用了 `self._lang`，每轮扫描都会抛 `name 'self' is not defined`，端口推断因此失效）。
+- 修复启动期阻塞 IO 告警：`integration_map.json` / 用户映射改为在 executer 里读取。
+- 英文环境下剩余的运行期中文全部补齐：通道「未启用/蓝牙无扫描器/串口不可见」原因、未知设备名、`not_loaded` 报错、端口推断的兜底标签。
+
 ### 0.9.2
 
 - **中英双语**：侧栏面板、汇总通知、设备渠道/端口/协议依据、候选集成打分理由全部随 Home Assistant 的语言切换（英文 / 简体中文）。Runtime 文案集中在 `i18n.py`，面板文案在 `STRINGS` 表里，config flow / 实体 / 服务仍走 `translations/`。

@@ -26,6 +26,19 @@ STRINGS: dict[str, dict[str, str]] = {
     "channel.serial": {EN: "Serial device", ZH: "串口设备"},
     "channel.arp": {EN: "LAN · ARP neighbour", ZH: "局域网 · ARP 邻居"},
     "channel.none": {EN: "Uncategorised", ZH: "未分类"},
+    "channel.disabled": {EN: "not enabled", ZH: "未启用"},
+    "channel.ble_no_scanner": {
+        EN: "Bluetooth adapter/proxy configured ({count}), but no scanner is online right now",
+        ZH: "蓝牙适配器/代理已配置 {count} 个，但当前没有在线扫描器",
+    },
+    "channel.ble_no_entries": {
+        EN: "No Bluetooth scanner enabled (no adapter or proxy configured)",
+        ZH: "没有已启用的蓝牙扫描器（未配置适配器或代理）",
+    },
+    "channel.serial_missing": {
+        EN: "/dev/serial/by-id is not visible inside the container (no adapter plugged in, or the port is not mapped)",
+        ZH: "容器内看不到 /dev/serial/by-id（未插适配器或串口未映射进容器）",
+    },
     # ------------------------------------------------------------- port labels
     "port.445": {EN: "SMB file share", ZH: "SMB 文件共享"},
     "port.554": {EN: "RTSP stream", ZH: "RTSP 视频流"},
@@ -61,6 +74,9 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "**{count}** device(s) can be added now:\n\n{lines}\n\nOpen the “LAN Discovery” panel in the sidebar to see every device, configure it or install the matching integration.",
         ZH: "发现 **{count}** 台可接入的设备：\n\n{lines}\n\n打开侧栏「局域网发现」面板可查看全部设备、一键配置或安装对应集成。",
     },
+    # ------------------------------------------------------------------ names
+    "registry.unknown": {EN: "Unknown device", ZH: "未知设备"},
+    "ws.not_loaded": {EN: "The integration is not running yet", ZH: "集成尚未启动"},
     # ------------------------------------------------------------------ serial
     "serial.zigbee_adapter": {EN: "Zigbee adapter", ZH: "Zigbee 适配器"},
     "serial.zwave_adapter": {EN: "Z-Wave adapter", ZH: "Z-Wave 适配器"},

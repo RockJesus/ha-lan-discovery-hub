@@ -9,6 +9,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 
+from .i18n import t
 from .const import DOMAIN
 from .hub import async_get_hub
 
@@ -30,7 +31,7 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
 def _hub_or_error(connection: Any, msg: dict[str, Any]) -> Any:
     hub = async_get_hub(connection.hass)
     if hub is None:
-        connection.send_error(msg["id"], "not_loaded", "集成尚未启动")
+        connection.send_error(msg["id"], "not_loaded", t(connection.hass, "ws.not_loaded"))
         return None
     return hub
 

@@ -57,13 +57,13 @@ class Match:
 # whose setup talks to that port are listed; everything else is a label for the
 # panel, never a suggestion.
 PORT_DOMAIN_HINTS: dict[int, tuple[str, str]] = {
-    3493: ("nut", "NUT 监控服务"),
-    1883: ("mqtt", "MQTT 消息代理"),
+    3493: ("nut", "NUT monitor"),
+    1883: ("mqtt", "MQTT broker"),
     8883: ("mqtt", "MQTT over TLS"),
-    32400: ("plex", "Plex 媒体服务器"),
+    32400: ("plex", "Plex media server"),
     5000: ("synology_dsm", "Synology DSM"),
     5001: ("synology_dsm", "Synology DSM (HTTPS)"),
-    6053: ("esphome", "ESPHome 原生 API"),
+    6053: ("esphome", "ESPHome native API"),
 }
 
 
@@ -87,11 +87,28 @@ class IntegrationMatcher:
 
     def __init__(self, config_dir: str) -> None:
         """Load curated and user maps."""
-        package_dir = Path(__file__).parent
-        self._curated = _load_json(package_dir / "integration_map.json")
-        self._user = _load_json(Path(config_dir) / USER_MAP_FILENAME)
+        self._config_dir = Path(config_dir)
+        # Loaded lazily (or ahead of time through async_load_maps) so setup
+        # never does blocking file I/O inside the event loop.
+        self._curated: list[dict[str, Any]] | None = None
+        self._user: list[dict[str, Any]] | None = None
         self._display_names: dict[str, str | None] = {}
         self._lang = EN
+
+    def _read_maps(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        package_dir = Path(__file__).parent
+        return (
+            _load_json(package_dir / "integration_map.json"),
+            _load_json(self._config_dir / USER_MAP_FILENAME),
+        )
+
+    def _ensure_maps(self) -> None:
+        if self._curated is None or self._user is None:
+            self._curated, self._user = self._read_maps()
+
+    async def async_load_maps(self, hass: Any) -> None:
+        """Read the curated/user maps in the executor."""
+        self._curated, self._user = await hass.async_add_executor_job(self._read_maps)
 
     # ------------------------------------------------------------------ core
 
@@ -122,6 +139,7 @@ class IntegrationMatcher:
         curated and user entries add third-party ones that core does not know.
         """
         types = {str(key) for key in self._zeroconf_table()}
+        self._ensure_maps()
         for entry in (*self._curated, *self._user):
             if entry.get("source") != SOURCE_MDNS:
                 continue
@@ -157,8 +175,8 @@ class IntegrationMatcher:
             )
 
         for layer, entries in (
-            (MATCH_USER, self._user),
-            (MATCH_CURATED, self._curated),
+            (MATCH_USER, self._user or []),
+            (MATCH_CURATED, self._curated or []),
         ):
             match = self._match_entries(entries, observation, layer)
             if match is not None:
@@ -172,8 +190,7 @@ class IntegrationMatcher:
             return self._match_ports(observation)
         return None
 
-    @staticmethod
-    def _match_ports(observation: Any) -> Match | None:
+    def _match_ports(self, observation: Any) -> Match | None:
         """Infer an integration from the ports a probe found.
 
         A port is a much weaker signal than a service type, so the result is

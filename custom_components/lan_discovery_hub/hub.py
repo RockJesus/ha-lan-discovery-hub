@@ -144,6 +144,7 @@ class DiscoveryHub:
         # the first scan so the very first render already has candidates.
         await self.catalog.async_load()
         self.matcher.set_language(language_of(self.hass))
+        await self.matcher.async_load_maps(self.hass)
         self._installed_domains = _installed_domains(self.hass)
         await self._async_load()
 
@@ -726,20 +727,20 @@ class DiscoveryHub:
                     "available": self._mdns is not None,
                     "reason": None
                     if self._mdns is not None
-                    else "未启用",
+                    else t(self.hass, "channel.disabled"),
                     "types": getattr(self._mdns, "type_count", 0),
                 },
                 "ble": {
                     "available": bool(self._ble and self._ble.available),
-                    "reason": self._ble.reason if self._ble else "未启用",
+                    "reason": self._ble.reason if self._ble else t(self.hass, "channel.disabled"),
                 },
                 "mqtt": {
                     "available": bool(self._mqtt and self._mqtt.available),
-                    "reason": self._mqtt.reason if self._mqtt else "未启用",
+                    "reason": self._mqtt.reason if self._mqtt else t(self.hass, "channel.disabled"),
                 },
                 "serial": {
                     "available": bool(self._serial and self._serial.available),
-                    "reason": self._serial.reason if self._serial else "未启用",
+                    "reason": self._serial.reason if self._serial else t(self.hass, "channel.disabled"),
                 },
             },
             "scanning": self.scanning,

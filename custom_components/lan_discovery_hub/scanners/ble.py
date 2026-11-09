@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from ..const import BLE_VENDORS, SOURCE_BLE
+from ..i18n import t
 from ..registry import Observation, normalize_mac
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,10 +75,10 @@ class BleScanner:
                 entries = self.hass.config_entries.async_entries("bluetooth")
             except Exception:  # noqa: BLE001
                 entries = []
-            self.reason = (
-                f"蓝牙适配器/代理已配置 {len(entries)} 个，但当前没有在线扫描器"
-                if entries
-                else "没有已启用的蓝牙扫描器（未配置适配器或代理）"
+            self.reason = t(
+                self.hass,
+                "channel.ble_no_scanner" if entries else "channel.ble_no_entries",
+                count=len(entries),
             )
         _LOGGER.debug("蓝牙通道就绪，扫描器 %s 个", len(scanners))
 
