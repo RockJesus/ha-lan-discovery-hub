@@ -23,6 +23,8 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_forget)
     websocket_api.async_register_command(hass, websocket_restore)
     websocket_api.async_register_command(hass, websocket_configure)
+    websocket_api.async_register_command(hass, websocket_catalog)
+    websocket_api.async_register_command(hass, websocket_catalog_refresh)
 
 
 def _hub_or_error(connection: Any, msg: dict[str, Any]) -> Any:
@@ -159,3 +161,53 @@ async def websocket_configure(
         return
     result = await hub.async_configure(msg["domain"])
     connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/catalog",
+        vol.Optional("query", default=""): str,
+        vol.Optional("limit", default=20): int,
+    }
+)
+@websocket_api.async_response
+async def websocket_catalog(
+    hass: HomeAssistant, connection: Any, msg: dict[str, Any]
+) -> None:
+    """Search the marketplace catalog the suggestions are drawn from."""
+    hub = _hub_or_error(connection, msg)
+    if hub is None:
+        return
+    query = (msg.get("query") or "").strip().lower()
+    limit = max(1, min(int(msg.get("limit") or 20), 100))
+    entries = hub.catalog.entries
+    if query:
+        entries = [
+            entry
+            for entry in entries
+            if query in entry.get("domain", "").lower()
+            or query in entry.get("name", "").lower()
+            or query in entry.get("description", "").lower()
+            or query in entry.get("full_name", "").lower()
+        ]
+    connection.send_result(
+        msg["id"],
+        {
+            "info": hub.catalog.info(),
+            "total": len(entries),
+            "entries": entries[:limit],
+        },
+    )
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/catalog/refresh"})
+@websocket_api.async_response
+async def websocket_catalog_refresh(
+    hass: HomeAssistant, connection: Any, msg: dict[str, Any]
+) -> None:
+    """Re-fetch the catalog now."""
+    hub = _hub_or_error(connection, msg)
+    if hub is None:
+        return
+    ok = await hub.catalog.async_refresh()
+    connection.send_result(msg["id"], {"success": ok, **hub.catalog.info()})

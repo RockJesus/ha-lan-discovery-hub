@@ -6,6 +6,7 @@ import asyncio
 import ipaddress
 from datetime import UTC, datetime, timedelta
 import logging
+from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import SOURCE_USER
@@ -14,6 +15,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.storage import Store
 
+from .catalog import IntegrationCatalog
 from .const import (
     CONF_FULL_SWEEP,
     CONF_IGNORED_DEVICES,
@@ -99,6 +101,7 @@ class DiscoveryHub:
         options = entry.options
 
         self.registry = DeviceRegistry()
+        self.catalog = IntegrationCatalog(hass)
         self.matcher = IntegrationMatcher(hass.config.config_dir)
         self.store: Store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
 
@@ -113,6 +116,7 @@ class DiscoveryHub:
         self._notify_unsub: Any = None
         self._scan_lock = asyncio.Lock()
 
+        self._installed_domains: set[str] = set()
         self._sources = list(options.get(CONF_SOURCES, DEFAULT_SOURCES))
         self._interval = max(
             60, int(options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
@@ -134,7 +138,11 @@ class DiscoveryHub:
     # ------------------------------------------------------------------ live
 
     async def async_start(self) -> None:
-        """Load stored devices and start every enabled scanner."""
+        """Load stored devices, the catalog, and start every enabled scanner."""
+        # The catalog is what turns evidence into a suggestion; load it before
+        # the first scan so the very first render already has candidates.
+        await self.catalog.async_load()
+        self._installed_domains = _installed_domains(self.hass)
         await self._async_load()
 
         if SOURCE_MDNS in self._sources:
@@ -681,8 +689,19 @@ class DiscoveryHub:
             visible,
             key=lambda item: (-STATE_ORDER.get(item.state, 0), item.name.lower()),
         )
+        payload = []
+        for record in records:
+            item = record.as_dict()
+            try:
+                item["suggestions"] = self.catalog.suggest(record, self._installed_domains)
+            except Exception as err:  # noqa: BLE001 - a suggestion never breaks a render
+                _LOGGER.debug("生成集成建议失败 %s: %s", record.name, err)
+                item["suggestions"] = []
+            payload.append(item)
+
         return {
-            "devices": [record.as_dict() for record in records],
+            "catalog": self.catalog.info(),
+            "devices": payload,
             "counts": counts,
             "total": len(visible),
             "ignored_count": sum(1 for r in self.registry.records.values() if r.ignored),
@@ -724,3 +743,21 @@ def async_get_hub(hass: HomeAssistant) -> DiscoveryHub | None:
         return None
     hubs = store.get("hubs") or {}
     return next(iter(hubs.values()), None)
+
+
+def _installed_domains(hass: Any) -> set[str]:
+    """Domains that exist in this installation, core or custom."""
+    domains: set[str] = set()
+    try:
+        import homeassistant  # noqa: PLC0415
+
+        core = Path(homeassistant.__file__).parent / "components"
+        domains.update(entry.name for entry in core.iterdir() if entry.is_dir())
+    except (ImportError, OSError):  # pragma: no cover
+        pass
+    try:
+        custom = Path(hass.config.config_dir) / "custom_components"
+        domains.update(entry.name for entry in custom.iterdir() if entry.is_dir())
+    except (AttributeError, OSError):  # pragma: no cover
+        pass
+    return domains

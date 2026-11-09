@@ -13,6 +13,8 @@ class LanDiscoveryHubPanel extends HTMLElement {
     this._grouped = false;
     this._narrow = false;
     this._confirm = null;
+    this._picking = null;
+    this._catalog = {};
     this._render();
   }
 
@@ -63,6 +65,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
       this._devices = result.devices || [];
       this._counts = result.counts || {};
       this._meta = result || {};
+      this._catalog = (result && result.catalog) || this._catalog || {};
       this._error = "";
     } catch (err) {
       this._error = err && err.message ? err.message : String(err);
@@ -496,6 +499,18 @@ class LanDiscoveryHubPanel extends HTMLElement {
         .head { display:flex; align-items:center; gap:10px; margin:0 0 4px; }
         .head h1 { margin:0; flex:1 1 auto; }
         .head .back { padding:4px 10px; font-size:13px; white-space:nowrap; }
+        .modal .box.wide { width:min(560px, 94vw); }
+        .cands { max-height: 58vh; overflow:auto; margin: 6px 0 12px; }
+        .cand { display:flex; gap:10px; align-items:flex-start; padding:8px 4px;
+                border-bottom:1px solid var(--divider-color); cursor:pointer; }
+        .cand input { margin-top:4px; }
+        .cand img, .cand .cand-noicon { width:28px; height:28px; border-radius:6px; flex:0 0 auto;
+                background: var(--secondary-background-color); }
+        .cand-body { display:flex; flex-direction:column; gap:2px; min-width:0; }
+        .cand-name { font-weight:500; font-size:14px; }
+        .cand-meta { font-size:12px; color: var(--secondary-text-color); }
+        .cand-desc { font-size:12px; color: var(--secondary-text-color); }
+        button.cand { margin-top:6px; }
         .devcard { background: var(--card-background-color); border-radius:10px; padding:10px 12px; margin-bottom:10px;
                    box-shadow: var(--ha-card-box-shadow, 0 1px 2px rgba(0,0,0,.1)); }
         .devcard .top { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
@@ -550,6 +565,23 @@ class LanDiscoveryHubPanel extends HTMLElement {
             </table>`
       }
       ${
+        this._picking
+          ? `<div class="modal">
+              <div class="box wide">
+                <h2>「${this._picking.device.name}」的候选集成</h2>
+                <div class="hint">来自市场目录 ${this._catalog?.total ?? 0} 条集成，按与设备的匹配度排序。勾选后可一次安装多个，装完需要重启 Home Assistant。</div>
+                <div class="cands">
+                  ${(this._picking.device.suggestions || []).map((c) => this._candRow(c)).join("")}
+                </div>
+                <div class="row">
+                  <button class="ghost" data-act="pick-cancel">取消</button>
+                  <button class="primary" data-act="pick-install">安装所选（${this._picking.selected.size}）</button>
+                </div>
+              </div>
+            </div>`
+          : ""
+      }
+      ${
         this._confirm
           ? `<div class="modal">
               <div class="box">
@@ -597,6 +629,11 @@ class LanDiscoveryHubPanel extends HTMLElement {
         this._load();
       });
     }
+    this.shadowRoot.querySelectorAll("input[data-act=pick-toggle]").forEach((box) => {
+      box.addEventListener("change", (event) => {
+        this._toggleCandidate(box.getAttribute("data-domain"), event.target.checked);
+      });
+    });
     const renameField = this.shadowRoot.querySelector("#rename-input");
     if (renameField) {
       renameField.addEventListener("input", (event) => {
@@ -643,6 +680,9 @@ class LanDiscoveryHubPanel extends HTMLElement {
       <div class="line">地址 <b>${device.ip || "无 IP"}</b>${device.ip && (device.mac || device.host) ? ` · ${device.mac || device.host}` : ""}</div>
       <div class="line">协议 <b>${this._serviceSummary(device)}</b></div>
       <div class="line">建议 <b>${device.integration_name || device.domain || "—"}</b> · ${evidence}</div>
+      ${(device.suggestions || []).length
+        ? `<div class="line"><button class="ghost cand" data-act="pick" data-id="${device.device_id}">查看 ${device.suggestions.length} 个候选集成</button></div>`
+        : ""}
       <div class="line">${last}</div>
       <div class="acts">${this._actions(device)}</div>
     </div>`;
@@ -669,6 +709,11 @@ class LanDiscoveryHubPanel extends HTMLElement {
             ? `${device.match_evidence}${device.match_support > 1 ? ` · ${device.match_support} 种协议互证` : ""}`
             : device.repo || ""
         }</div>
+        ${
+          (device.suggestions || []).length
+            ? `<button class="ghost cand" data-act="pick" data-id="${device.device_id}">${device.suggestions.length} 个候选</button>`
+            : ""
+        }
       </td>
       <td>${this._badge(device)}</td>
       <td><div class="acts">${this._actions(device)}</div></td>
@@ -681,6 +726,109 @@ class LanDiscoveryHubPanel extends HTMLElement {
       return;
     }
     location.assign("/lovelace");
+  }
+
+  _candRow(candidate) {
+    const checked = this._picking?.selected?.has(candidate.domain) ? "checked" : "";
+    const icon = candidate.full_name
+      ? `https://github.com/${candidate.full_name.split("/")[0]}.png?size=64`
+      : "";
+    const install = candidate.installed
+      ? `<span class="badge" style="background:#0b8043">已安装</span>`
+      : "";
+    return `<label class="cand">
+      <input type="checkbox" data-act="pick-toggle" data-domain="${candidate.domain}" ${checked}>
+      ${icon ? `<img src="${icon}" alt="" width="28" height="28">` : `<span class="cand-noicon"></span>`}
+      <span class="cand-body">
+        <span class="cand-name">${candidate.name || candidate.domain} ${install}</span>
+        <span class="cand-meta">${candidate.domain} · ★ ${candidate.stars ?? 0} · ⤓ ${candidate.downloads ?? 0}二次 · ${candidate.reason || ""}</span>
+        <span class="cand-desc">${candidate.description || ""}</span>
+      </span>
+    </label>`;
+  }
+
+  _openCandidates(device) {
+    const selected = new Set();
+    for (const candidate of device.suggestions || []) {
+      if (!candidate.installed) selected.add(candidate.domain);
+    }
+    this._picking = { device, selected };
+    this._render();
+  }
+
+  _toggleCandidate(domain, checked) {
+    if (!this._picking) return;
+    const selected = this._picking.selected;
+    if (checked) selected.add(domain);
+    else selected.delete(domain);
+    // Update only the counter so the list keeps its scroll position.
+    const button = this.shadowRoot.querySelector("button[data-act=pick-install]");
+    if (button) button.textContent = `安装所选（${selected.size}）`;
+  }
+
+  async _installPicked() {
+    const picking = this._picking;
+    if (!picking) return;
+    const chosen = (picking.device.suggestions || []).filter(
+      (c) => picking.selected.has(c.domain) && !c.installed
+    );
+    if (!chosen.length) {
+      this._message = "没有勾选需要安装的集成。";
+      this._picking = null;
+      this._render();
+      return;
+    }
+    const total = chosen.length;
+    this._picking = null;
+    this._message = `正在安装 ${total} 个集成…`;
+    this._render();
+
+    let ok = 0;
+    const failed = [];
+    for (let index = 0; index < chosen.length; index += 1) {
+      const candidate = chosen[index];
+      this._message = `正在安装 ${index + 1}/${total}：${candidate.name || candidate.domain}…`;
+      this._render();
+      try {
+        await this._hass.callWS({
+          type: "marketplace/repository/install",
+          repository: String(candidate.id),
+        });
+      } catch (err) {
+        console.warn("install failed", candidate.domain, err);
+      }
+      // The install reply is unreliable, so confirm from the repository state.
+      let done = false;
+      for (let attempt = 0; attempt < 20 && !done; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 8000));
+        try {
+          const info = await this._hass.callWS({
+            type: "marketplace/repository/info",
+            repository_id: String(candidate.id),
+          });
+          if (
+            info?.status === "pending-restart" ||
+            (info?.installed_version && info?.installed_version === info?.available_version)
+          ) {
+            done = true;
+          }
+        } catch (err) {
+          // keep polling
+        }
+      }
+      if (done) ok += 1;
+      else failed.push(candidate.name || candidate.domain);
+    }
+
+    if (ok) {
+      this._message =
+        `已安装 ${ok} 个集成` +
+        (failed.length ? `，${failed.length} 个未确认（${failed.join("、")}）` : "") +
+        "。请重启 Home Assistant 后再点「配置」。";
+    } else {
+      this._message = `安装未确认：${failed.join("、") || "全部失败"}。请到 Marketplace 查看进度。`;
+    }
+    this._render();
   }
 
   _deviceById(id) {
@@ -701,6 +849,17 @@ class LanDiscoveryHubPanel extends HTMLElement {
     }
     // Dialog buttons carry no device id, so they must be handled before the
     // guard below - otherwise every modal button is a no-op.
+    if (act === "pick-cancel") {
+      this._picking = null;
+      this._render();
+      return undefined;
+    }
+    if (act === "pick-install") return this._installPicked();
+    if (act === "pick-toggle") {
+      this._toggleCandidate(event.currentTarget.getAttribute("data-domain"));
+      return undefined;
+    }
+    if (act === "pick" && device) return this._openCandidates(device);
     if (act === "confirm-cancel") return this._closeAsk();
     if (act === "confirm-ok") {
       const action = this._confirm?.onConfirm;
