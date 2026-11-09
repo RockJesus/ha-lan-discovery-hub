@@ -55,7 +55,7 @@ def is_configured(hass: Any, identifiers: list[Any]) -> bool:
     except Exception:  # noqa: BLE001
         return False
     wanted = {str(item) for item in identifiers}
-    for device in registry.devices.values():
+    for device in registry.devices:
         for domain, value in device.identifiers:
             if domain == "mqtt" and str(value) in wanted:
                 return True

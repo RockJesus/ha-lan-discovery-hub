@@ -108,6 +108,10 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.9.5
+
+- 修复 HA 2026.11 起标记的弃用用法：设备注册表不再当映射用（`registry.devices.values()` → 直接迭代 `registry.devices`），hub 与 MQTT 扫描器各一处。
+
 ### 0.9.4
 
 - 消除本集成自带的阻塞 IO 告警：`/usr/src/homeassistant/homeassistant/components` 目录扫描与 4.5 万行 `oui.tsv` 首次加载都改到 executor，不再在事件循环里跑。

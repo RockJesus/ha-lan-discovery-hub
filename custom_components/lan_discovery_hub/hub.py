@@ -548,7 +548,7 @@ class DiscoveryHub:
     def _async_is_device_configured(self, record: DeviceRecord) -> bool:
         """Whether an existing device registry entry already covers this device."""
         registry = dr.async_get(self.hass)
-        for device in registry.devices.values():
+        for device in registry.devices:
             if record.mac:
                 for connection_type, value in device.connections:
                     if (
