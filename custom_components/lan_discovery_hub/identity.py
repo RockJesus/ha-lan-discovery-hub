@@ -454,7 +454,10 @@ async def _async_web_title(
                 body = await response.content.read(_MAX_BODY)
                 text = body.decode("utf-8", "replace")
                 hint = page_hint(text)
-                if hint and not TITLE_RE.search(text):
+                match = TITLE_RE.search(text)
+                # An empty or boilerplate <title> is worse than nothing: fall
+                # back to the product words the page itself prints.
+                if hint and (match is None or not _clean_title(match.group(1))):
                     return hint[0]
         except Exception as err:  # noqa: BLE001 - a dead web UI must not fail a scan
             if errors is not None:
