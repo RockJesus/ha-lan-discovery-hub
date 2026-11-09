@@ -288,6 +288,7 @@ class DiscoveryHub:
                 continue
             record.hostname = info.get("hostname") or record.hostname
             record.web_title = info.get("web_title") or record.web_title
+            record.web_note = info.get("web_error") or record.web_note
 
     async def _async_save(self) -> None:
         try:

@@ -26,6 +26,7 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_configure)
     websocket_api.async_register_command(hass, websocket_catalog)
     websocket_api.async_register_command(hass, websocket_catalog_refresh)
+    websocket_api.async_register_command(hass, websocket_http_probe)
 
 
 def _hub_or_error(connection: Any, msg: dict[str, Any]) -> Any:
@@ -212,3 +213,21 @@ async def websocket_catalog_refresh(
         return
     ok = await hub.catalog.async_refresh()
     connection.send_result(msg["id"], {"success": ok, **hub.catalog.info()})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/http_probe",
+        vol.Required("ip"): str,
+        vol.Required("port"): int,
+    }
+)
+@websocket_api.async_response
+async def websocket_http_probe(
+    hass: HomeAssistant, connection: Any, msg: dict[str, Any]
+) -> None:
+    """Fetch one device web UI and report status, title or the exact error."""
+    from .identity import probe_http  # noqa: PLC0415 - keep import graph flat
+
+    result = await probe_http(hass, msg["ip"], int(msg["port"]))
+    connection.send_result(msg["id"], result)

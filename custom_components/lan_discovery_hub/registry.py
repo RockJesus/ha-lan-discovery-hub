@@ -346,6 +346,7 @@ class DeviceRecord:
     kind: str | None = None
     hostname: str | None = None
     web_title: str | None = None
+    web_note: str | None = None
     state: str = STATE_UNKNOWN
     domain: str | None = None
     integration_name: str | None = None
@@ -417,6 +418,7 @@ class DeviceRecord:
             "kind_label": kind_label(self.kind, lang),
             "hostname": self.hostname,
             "web_title": self.web_title,
+            "web_note": self.web_note,
             "state": self.state,
             "domain": self.domain,
             "integration_name": self.integration_name,
@@ -455,6 +457,7 @@ class DeviceRecord:
             kind=data.get("kind"),
             hostname=data.get("hostname"),
             web_title=data.get("web_title"),
+            web_note=data.get("web_note"),
             state=data.get("state", STATE_UNKNOWN),
             domain=data.get("domain"),
             integration_name=data.get("integration_name"),

@@ -336,7 +336,36 @@ def _clean_title(raw: str) -> str | None:
     return text
 
 
-async def _async_web_title(hass: HomeAssistant, ip: str, ports: list[int]) -> str | None:
+async def probe_http(hass: HomeAssistant, ip: str, port: int) -> dict[str, Any]:
+    """Fetch one URL and report status/title/error — used for diagnostics."""
+    session = async_get_clientsession(hass)
+    scheme = "https" if port in (443, 5001) else "http"
+    url = f"{scheme}://{ip}:{port}/"
+    try:
+        async with session.get(
+            url,
+            timeout=aiohttp.ClientTimeout(total=6),
+            ssl=False,
+            allow_redirects=True,
+            headers={"User-Agent": "HomeAssistant-LanDiscovery/1.0"},
+        ) as response:
+            body = await response.content.read(_MAX_BODY)
+            match = TITLE_RE.search(body.decode("utf-8", "replace"))
+            title = _clean_title(match.group(1)) if match else None
+            return {
+                "url": url,
+                "status": response.status,
+                "content_type": response.headers.get("Content-Type"),
+                "title": title,
+                "error": None,
+            }
+    except Exception as err:  # noqa: BLE001 - diagnostics must report, not raise
+        return {"url": url, "status": None, "title": None, "error": f"{type(err).__name__}: {err}"}
+
+
+async def _async_web_title(
+    hass: HomeAssistant, ip: str, ports: list[int], errors: dict[str, str] | None = None
+) -> str | None:
     """Page title of the device's own web UI, when it has one."""
     candidates = [port for port in ports if port in WEB_PORTS]
     if not candidates:
@@ -358,9 +387,13 @@ async def _async_web_title(hass: HomeAssistant, ip: str, ports: list[int]) -> st
                 headers={"User-Agent": "HomeAssistant-LanDiscovery/1.0"},
             ) as response:
                 if response.status >= 500:
+                    if errors is not None:
+                        errors[url] = f"HTTP {response.status}"
                     continue
                 body = await response.content.read(_MAX_BODY)
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, OSError):
+        except Exception as err:  # noqa: BLE001 - a dead web UI must not fail a scan
+            if errors is not None:
+                errors[url] = f"{type(err).__name__}: {err}"
             continue
         match = TITLE_RE.search(body.decode("utf-8", "replace"))
         if match:
@@ -414,8 +447,14 @@ async def async_enrich(
             hostname = None
             if not getattr(record, "host", None):
                 hostname = await _async_reverse_dns(hass, ip)
-            title = await _async_web_title(hass, ip, ports)
-            entry = {"at": now, "hostname": hostname, "web_title": title}
+            web_errors: dict[str, str] = {}
+            title = await _async_web_title(hass, ip, ports, web_errors)
+            entry = {
+                "at": now,
+                "hostname": hostname,
+                "web_title": title,
+                "web_error": next(iter(web_errors.values()), None),
+            }
             _CACHE[ip] = entry
             results[ip] = entry
 
