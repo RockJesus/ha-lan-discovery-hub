@@ -40,6 +40,16 @@ _STOPWORDS = {
     "component", "homeassistant", "ha", "a", "an", "of", "to", "in", "on",
     "device", "devices", "support", "supports", "based", "your", "this",
     "local", "network", "lan", "api", "client", "simple", "addon", "add",
+    # Generic words that appear in hundreds of integration names; matching on
+    # them produces noise such as "climate_group_helper" for a NAS.
+    "group", "helper", "sync", "mass", "queue", "saver", "proxy", "bridge",
+    "kit", "hub", "server", "tool", "tools", "edge", "cloud", "panel", "card",
+    "manager", "monitor", "sensor", "sensors", "utils", "utility", "extra",
+    # Legal / geographic suffixes that ride along with every vendor string.
+    "limited", "ltd", "inc", "co", "corporation", "company", "holdings",
+    "electronics", "electronic", "technology", "technologies", "tech",
+    "systems", "intelligent", "precise", "device", "devices", "communications",
+    "industrial", "china", "beijing", "shenzhen", "hangzhou", "hk",
 }
 
 
@@ -151,17 +161,20 @@ class IntegrationCatalog:
                 for port in props.get("ports") or []:
                     ports.add(str(port))
 
-        device_terms = set()
+        # Only identity-bearing text may match: a device *name* is often a user
+        # label ("客厅电视"), and matching it against descriptions is noise.
+        identity_terms = set()
         for value in (
-            getattr(record, "name", None),
             getattr(record, "manufacturer", None),
             getattr(record, "model", None),
             getattr(record, "vendor", None),
-            getattr(record, "host", None),
-            getattr(record, "detail_line", None),
         ):
-            device_terms |= _tokens(value)
-        device_terms |= kinds
+            words = _tokens(value)
+            # "Synology Incorporated" must match on `synology`, not on
+            # `incorporated`; the brand is the first meaningful word.
+            identity_terms |= {word for word in words if len(word) >= 4}
+
+        match_terms = identity_terms | kinds
 
         candidates: list[tuple[float, dict[str, Any]]] = []
         for entry in self.entries:
@@ -179,20 +192,24 @@ class IntegrationCatalog:
                 reasons.append("服务类型同名")
 
             domain_words = set(re.split(r"[_\-.]", domain)) - _STOPWORDS
-            overlap = domain_words & device_terms
-            if overlap:
-                score += 14 * min(len(overlap), 2)
-                reasons.append(f"域名含「{'、'.join(sorted(overlap))}」")
+            kind_hits = domain_words & kinds
+            vendor_hits = domain_words & identity_terms
+            if kind_hits:
+                score += 24 * min(len(kind_hits), 2)
+                reasons.append(f"域名与「{'、'.join(sorted(kind_hits))}」同源")
+            elif vendor_hits:
+                score += 16 * min(len(vendor_hits), 2)
+                reasons.append(f"域名含厂商「{'、'.join(sorted(vendor_hits))}」")
 
-            topic_hits = _tokens(" ".join(entry.get("topics") or [])) & device_terms
+            topic_hits = _tokens(" ".join(entry.get("topics") or [])) & match_terms
             if topic_hits:
-                score += 5 * min(len(topic_hits), 2)
+                score += (8 if topic_hits & kinds else 4) * min(len(topic_hits), 2)
                 reasons.append(f"标签「{'、'.join(sorted(topic_hits))}」")
 
             if not score:
-                desc_hits = _tokens(entry.get("description")) & device_terms
+                desc_hits = _tokens(entry.get("description")) & match_terms
                 if desc_hits:
-                    score += 3 * min(len(desc_hits), 3)
+                    score += 2 * min(len(desc_hits), 2)
                     reasons.append(f"描述含「{'、'.join(sorted(desc_hits))}」")
 
             if not score:
