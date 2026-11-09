@@ -16,6 +16,7 @@ from homeassistant.helpers.event import async_call_later, async_track_time_inter
 from homeassistant.helpers.storage import Store
 
 from .catalog import IntegrationCatalog
+from . import identity
 from .i18n import language_of, t
 from .const import (
     CONF_FULL_SWEEP,
@@ -254,6 +255,38 @@ class DiscoveryHub:
             if record.domain and not record.match_evidence:
                 record.match_evidence = t(self.hass, "evidence.history")
 
+    async def _async_enrich_identities(self) -> None:
+        """Say what each device is, not just where it is.
+
+        Classification uses evidence we already hold (mDNS service types, UPnP
+        device types, open ports, vendor prefix). Hostname and web-UI title need
+        the device to answer, so those are cached for hours and kept bounded.
+        """
+        records = list(self.registry.records.values())
+        for record in records:
+            if record.kind:
+                continue
+            try:
+                record.kind = identity.classify(
+                    record.services,
+                    manufacturer=record.manufacturer,
+                    model=record.model,
+                    vendor=record.vendor,
+                )
+            except Exception as err:  # noqa: BLE001 - identity must never break a scan
+                _LOGGER.debug("识别设备类型失败 %s: %s", record.name, err)
+        try:
+            learned = await identity.async_enrich(self.hass, records)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("补充主机名/网页标题失败: %s", err)
+            return
+        for record in records:
+            info = learned.get(record.ip or "")
+            if not info:
+                continue
+            record.hostname = info.get("hostname") or record.hostname
+            record.web_title = info.get("web_title") or record.web_title
+
     async def _async_save(self) -> None:
         try:
             await self.store.async_save(self.registry.as_payload())
@@ -314,6 +347,7 @@ class DiscoveryHub:
                 self.scanning = False
                 self.last_scan = _utcnow()
 
+        await self._async_enrich_identities()
         self.registry.normalize_names()
         removed = self.registry.drop_noise(is_noise_ip)
         if removed:

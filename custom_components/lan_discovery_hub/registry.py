@@ -22,7 +22,7 @@ import pathlib
 import re
 from typing import Any, Final
 
-from .i18n import EN, STRINGS, ZH, t
+from .i18n import EN, STRINGS, ZH, kind_label, t
 
 
 # What usually listens on a port. Used purely as a label under a device that
@@ -341,6 +341,11 @@ class DeviceRecord:
     host: str | None = None
     manufacturer: str | None = None
     model: str | None = None
+    # What the thing actually is (tv / nas / printer / …), plus what it calls
+    # itself on the network. All optional: unknown stays unknown.
+    kind: str | None = None
+    hostname: str | None = None
+    web_title: str | None = None
     state: str = STATE_UNKNOWN
     domain: str | None = None
     integration_name: str | None = None
@@ -408,6 +413,10 @@ class DeviceRecord:
             "host": self.host,
             "manufacturer": self.manufacturer,
             "model": self.model,
+            "kind": self.kind,
+            "kind_label": kind_label(self.kind, lang),
+            "hostname": self.hostname,
+            "web_title": self.web_title,
             "state": self.state,
             "domain": self.domain,
             "integration_name": self.integration_name,
@@ -443,6 +452,9 @@ class DeviceRecord:
             host=data.get("host"),
             manufacturer=data.get("manufacturer"),
             model=data.get("model"),
+            kind=data.get("kind"),
+            hostname=data.get("hostname"),
+            web_title=data.get("web_title"),
             state=data.get("state", STATE_UNKNOWN),
             domain=data.get("domain"),
             integration_name=data.get("integration_name"),

@@ -888,6 +888,14 @@ class LanDiscoveryHubPanel extends HTMLElement {
     }
   }
 
+  /** What the device is + who makes it, on one line. */
+  _ident(device) {
+    const parts = [device.kind_label, device.vendor || device.manufacturer, device.model];
+    const text = parts.filter(Boolean).join(" · ");
+    if (text) return text;
+    return device.web_title || "";
+  }
+
   _card(device) {
     const last = device.last_seen ? new Date(device.last_seen).toLocaleString() : "";
     const evidence = device.match_evidence
@@ -898,10 +906,8 @@ class LanDiscoveryHubPanel extends HTMLElement {
         <span class="n">${device.name}${device.ignored ? ` <span class="badge" style="background:#788">${this._t("ignored")}</span>` : ""}</span>
         ${this._badge(device)}
       </div>
-      <div class="line">${[device.channel_label, device.vendor || device.manufacturer || device.model]
-        .filter(Boolean)
-        .join(" · ") || device.detail_line || ""}</div>
-      <div class="line">${this._t("addr")} <b>${device.ip || this._t("no_ip")}</b>${device.ip && (device.mac || device.host) ? ` · ${device.mac || device.host}` : ""}</div>
+      <div class="line">${this._ident(device) || device.channel_label}</div>
+      <div class="line">${this._t("addr")} <b>${device.ip || this._t("no_ip")}</b>${device.ip && (device.mac || device.hostname || device.host) ? ` · ${device.mac || device.hostname || device.host}` : ""}</div>
       <div class="line">${this._t("proto")} <b>${this._serviceSummary(device)}</b></div>
       <div class="line">${this._t("sugg")} <b>${device.integration_name || device.domain || "—"}</b> · ${evidence}</div>
       ${(device.suggestions || []).length
@@ -917,13 +923,11 @@ class LanDiscoveryHubPanel extends HTMLElement {
     return `<tr>
       <td>
         <div class="name">${device.name}${device.ignored ? ` <span class="badge" style="background:#788">${this._t("ignored")}</span>` : ""}</div>
-        <div class="meta">${[device.channel_label, device.vendor || device.manufacturer || device.model || device.detail_line]
-          .filter(Boolean)
-          .join(" · ")}</div>
+        <div class="meta">${this._ident(device) || device.detail_line || ""}</div>
       </td>
       <td>
         <div>${device.ip || `<span class="noip">${this._t("no_ip")}</span>`}</div>
-        <div class="meta">${device.ip ? (device.mac || device.host || "") : (device.mac || device.detail_line || "")}</div>
+        <div class="meta">${device.ip ? (device.mac || device.hostname || device.host || "") : (device.mac || device.detail_line || "")}</div>
       </td>
       <td class="meta"><div>${this._serviceSummary(device)}</div><div>${last}</div></td>
       <td>

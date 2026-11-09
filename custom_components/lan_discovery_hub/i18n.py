@@ -66,6 +66,21 @@ STRINGS: dict[str, dict[str, str]] = {
     "detail.mqtt_auto": {EN: "MQTT auto-discovery", ZH: "MQTT 自动发现"},
     "detail.serial": {EN: "Serial device", ZH: "串口设备"},
     "detail.ports": {EN: "Ports {ports}", ZH: "端口 {ports}"},
+    # --------------------------------------------------------------- identity
+    "kind.tv": {EN: "TV", ZH: "电视"},
+    "kind.media_player": {EN: "Media player", ZH: "播放设备"},
+    "kind.speaker": {EN: "Speaker", ZH: "音响"},
+    "kind.nas": {EN: "NAS", ZH: "NAS"},
+    "kind.printer": {EN: "Printer", ZH: "打印机"},
+    "kind.router": {EN: "Router / gateway", ZH: "路由器"},
+    "kind.camera": {EN: "Camera", ZH: "摄像头"},
+    "kind.computer": {EN: "Computer", ZH: "电脑"},
+    "kind.phone": {EN: "Phone", ZH: "手机"},
+    "kind.tablet": {EN: "Tablet", ZH: "平板"},
+    "kind.iot": {EN: "Smart device", ZH: "智能设备"},
+    "kind.hub": {EN: "Smart-home hub", ZH: "智能家居中枢"},
+    "kind.server": {EN: "Server", ZH: "服务器"},
+    "kind.appliance": {EN: "Appliance", ZH: "家电"},
     # ------------------------------------------------------------- notification
     "notify.title": {EN: "LAN Discovery", ZH: "局域网发现"},
     "notify.line": {EN: "- **{name}** ({where}) → {integration}", ZH: "- **{name}**（{where}）→ {integration}"},
@@ -122,3 +137,31 @@ def t(hass: Any, key: str, **fmt: Any) -> str:
         except (KeyError, IndexError):  # pragma: no cover - defensive
             return text
     return text
+
+
+KIND_KEYS = (
+    "tv",
+    "media_player",
+    "speaker",
+    "nas",
+    "printer",
+    "router",
+    "camera",
+    "computer",
+    "phone",
+    "tablet",
+    "iot",
+    "hub",
+    "server",
+    "appliance",
+)
+
+
+def kind_label(kind: str | None, lang: str | None = None) -> str | None:
+    """Localized name of a device class, or None when it is unknown."""
+    if not kind or kind not in KIND_KEYS:
+        return None
+    entry = STRINGS.get(f"kind.{kind}")
+    if not entry:
+        return None
+    return entry.get(lang or EN) or entry.get(EN)

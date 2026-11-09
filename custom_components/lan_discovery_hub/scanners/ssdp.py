@@ -25,8 +25,8 @@ _LOGGER = logging.getLogger(__name__)
 
 SSDP_ADDR = ("239.255.255.250", 1900)
 SEARCH_TIMEOUT = 4.0
-MAX_DESCRIPTION_FETCH = 24
-FETCH_CONCURRENCY = 6
+MAX_DESCRIPTION_FETCH = 48
+FETCH_CONCURRENCY = 8
 MAX_DESCRIPTION_BYTES = 200_000
 
 _XML_FIELDS = {
@@ -149,13 +149,21 @@ class SsdpScanner:
         # number of devices: a hostile or slow device must not stall the scan.
         items = list(responses.items())[:MAX_DESCRIPTION_FETCH]
         semaphore = asyncio.Semaphore(FETCH_CONCURRENCY)
+        # One device answers several M-SEARCH targets with the same LOCATION;
+        # fetching it once per round keeps the scan fast and leaves room to
+        # describe more devices within the budget.
+        seen_locations: dict[str, dict[str, str]] = {}
 
         async def _enrich(headers: dict[str, str]) -> dict[str, str]:
             location = headers.get("location")
             if not location:
                 return {}
+            if location in seen_locations:
+                return seen_locations[location]
             async with semaphore:
-                return await self._async_fetch_description(location)
+                description = await self._async_fetch_description(location)
+            seen_locations[location] = description
+            return description
 
         descriptions = await asyncio.gather(
             *(_enrich(headers) for _, headers in items), return_exceptions=True
@@ -181,8 +189,9 @@ class SsdpScanner:
         try:
             async with session.get(
                 location,
-                timeout=aiohttp.ClientTimeout(total=2),
-                allow_redirects=False,
+                timeout=aiohttp.ClientTimeout(total=3),
+                allow_redirects=True,
+                ssl=False,
             ) as resp:
                 if resp.status != 200:
                     return {}
