@@ -100,6 +100,11 @@ HACS → 自定义存储库 → 类别 `Integration` → 填入本仓库 → 安
 
 ## 版本记录
 
+### 0.8.2
+
+- **手机端可用**：面板在窄屏（<760px）切换成卡片列表，不再把六列表格硬塞进手机，徽章、建议依据、操作按钮都能正常读。
+- 标题旁新增「‹ 返回」：Companion App 从侧栏进入面板后，点它回上一页；没有历史时落到 `/lovelace`。
+
 ### 0.8.1
 
 - **MAC 厂商标注**：内置 IEEE OUI 全表（45,192 个前缀，来自 nmap-mac-prefixes），ARP/探测/蓝牙行只要有 MAC 就能显示厂商（实测 Synology Incorporated、Huawei Technologies 等）。官方发现没有 OUI 库，这一点是纯增量。

@@ -11,6 +11,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
     this._filter = "";
     this._showIgnored = false;
     this._grouped = false;
+    this._narrow = false;
     this._confirm = null;
     this._render();
   }
@@ -24,7 +25,30 @@ class LanDiscoveryHubPanel extends HTMLElement {
   }
 
   connectedCallback() {
+    this._applyWidth();
     this._render();
+  }
+
+  disconnectedCallback() {
+    if (this._onResize) {
+      window.removeEventListener("resize", this._onResize);
+      this._onResize = null;
+    }
+  }
+
+  _applyWidth() {
+    const narrow = (window.innerWidth || 1024) < 760;
+    this._narrow = narrow;
+    if (!this._onResize) {
+      this._onResize = () => {
+        const next = (window.innerWidth || 1024) < 760;
+        if (next !== this._narrow) {
+          this._narrow = next;
+          this._render();
+        }
+      };
+      window.addEventListener("resize", this._onResize);
+    }
   }
 
   // ------------------------------------------------------------------ data
@@ -418,6 +442,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
 
   _render() {
     if (!this.shadowRoot) return;
+    this._applyWidth();
     const counts = this._counts || {};
     const rows = this._rows();
     const total = this._meta?.total ?? this._devices.length;
@@ -468,8 +493,21 @@ class LanDiscoveryHubPanel extends HTMLElement {
         .modal .hint { color: var(--secondary-text-color); font-size:12px; margin:8px 0 14px; }
         .modal .row { display:flex; gap:8px; justify-content:flex-end; }
         .acts button { padding:4px 8px; font-size:12px; white-space:nowrap; }
+        .head { display:flex; align-items:center; gap:10px; margin:0 0 4px; }
+        .head h1 { margin:0; flex:1 1 auto; }
+        .head .back { padding:4px 10px; font-size:13px; white-space:nowrap; }
+        .devcard { background: var(--card-background-color); border-radius:10px; padding:10px 12px; margin-bottom:10px;
+                   box-shadow: var(--ha-card-box-shadow, 0 1px 2px rgba(0,0,0,.1)); }
+        .devcard .top { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+        .devcard .top .n { font-weight:500; }
+        .devcard .line { font-size:12px; color: var(--secondary-text-color); margin-top:4px; }
+        .devcard .line b { color: var(--primary-text-color); font-weight:500; }
+        .devcard .acts { margin-top:8px; flex-wrap:wrap; }
       </style>
-      <h1>局域网发现</h1>
+      <div class="head">
+        <h1>局域网发现</h1>
+        <button class="ghost back" data-act="back" title="回到 Home Assistant">‹ 返回</button>
+      </div>
       <div class="sub">
         共 ${total} 台设备 · 来源：${(this._meta?.sources || []).join(" / ") || "未启用"}
         ${this._meta?.last_scan ? `· 上次扫描 ${this._meta.last_scan}` : ""}
@@ -500,7 +538,9 @@ class LanDiscoveryHubPanel extends HTMLElement {
       ${
         rows.length === 0
           ? `<div class="empty">还没有发现设备。首次扫描在启动约 20 秒后开始，也可以在选项里换扫描通道。</div>`
-          : `<table>
+          : this._narrow
+            ? `<div class="cards-list">${rows.map((device) => this._card(device)).join("")}</div>`
+            : `<table>
               <colgroup>
                 <col class="c-device"><col class="c-addr"><col class="c-proto">
                 <col class="c-sugg"><col class="c-state"><col class="c-acts">
@@ -587,6 +627,27 @@ class LanDiscoveryHubPanel extends HTMLElement {
     }
   }
 
+  _card(device) {
+    const last = device.last_seen ? new Date(device.last_seen).toLocaleString() : "";
+    const evidence = device.match_evidence
+      ? `${device.match_evidence}${device.match_support > 1 ? ` · ${device.match_support} 种协议互证` : ""}`
+      : device.repo || "—";
+    return `<div class="devcard">
+      <div class="top">
+        <span class="n">${device.name}${device.ignored ? ' <span class="badge" style="background:#788">已忽略</span>' : ""}</span>
+        ${this._badge(device)}
+      </div>
+      <div class="line">${[device.channel_label, device.vendor || device.manufacturer || device.model]
+        .filter(Boolean)
+        .join(" · ") || device.detail_line || ""}</div>
+      <div class="line">地址 <b>${device.ip || "无 IP"}</b>${device.ip && (device.mac || device.host) ? ` · ${device.mac || device.host}` : ""}</div>
+      <div class="line">协议 <b>${this._serviceSummary(device)}</b></div>
+      <div class="line">建议 <b>${device.integration_name || device.domain || "—"}</b> · ${evidence}</div>
+      <div class="line">${last}</div>
+      <div class="acts">${this._actions(device)}</div>
+    </div>`;
+  }
+
   _row(device) {
     const last = device.last_seen ? new Date(device.last_seen).toLocaleString() : "";
     return `<tr>
@@ -614,6 +675,14 @@ class LanDiscoveryHubPanel extends HTMLElement {
     </tr>`;
   }
 
+  _goBack() {
+    if (history.length > 1) {
+      history.back();
+      return;
+    }
+    location.assign("/lovelace");
+  }
+
   _deviceById(id) {
     return this._devices.find((device) => device.device_id === id);
   }
@@ -623,6 +692,7 @@ class LanDiscoveryHubPanel extends HTMLElement {
     const id = event.currentTarget.getAttribute("data-id");
     const device = id ? this._deviceById(id) : null;
 
+    if (act === "back") return this._goBack();
     if (act === "scan") return this._scan(false);
     if (act === "sweep") return this._scan(true);
     if (act === "integrations") {
